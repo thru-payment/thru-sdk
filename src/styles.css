@@ -1,0 +1,168 @@
+/*
+ * Default theme for thru widgets. Optional: import "@thru/pay-sdk/styles.css".
+ * Everything is driven by CSS variables, so override the tokens (via the `theme`
+ * prop, or by setting the variables), restyle parts with `classNames`, or skip
+ * this file entirely and use the `unstyled` prop for a headless render.
+ */
+
+.thru-root {
+  --thru-bg: #ffffff;
+  --thru-surface: #ffffff;
+  --thru-border: #e5e9e7;
+  --thru-text: #0c1310;
+  --thru-muted: #586660;
+  --thru-accent: #0fb981;
+  --thru-accent-text: #04130d;
+  --thru-success: #047857;
+  --thru-warning: #b45309;
+  --thru-danger: #be123c;
+  --thru-radius: 14px;
+  --thru-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --thru-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --thru-space: 16px;
+
+  color: var(--thru-text);
+  font-family: var(--thru-font);
+}
+
+.thru-root *,
+.thru-root *::before,
+.thru-root *::after {
+  box-sizing: border-box;
+}
+
+.thru-checkout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--thru-space);
+  max-width: 360px;
+  padding: var(--thru-space);
+  background: var(--thru-surface);
+  border: 1px solid var(--thru-border);
+  border-radius: var(--thru-radius);
+}
+
+.thru-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.thru-amount-value {
+  font-family: var(--thru-font-mono);
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.thru-amount-token {
+  font-size: 14px;
+  color: var(--thru-muted);
+}
+.thru-amount-sub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--thru-muted);
+}
+
+.thru-qr {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid var(--thru-border);
+  border-radius: calc(var(--thru-radius) - 4px);
+}
+.thru-qr img {
+  display: block;
+  width: 200px;
+  height: 200px;
+}
+
+.thru-address {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: color-mix(in oklab, var(--thru-text) 4%, transparent);
+  border-radius: 8px;
+}
+.thru-address-value {
+  overflow: hidden;
+  font-family: var(--thru-font-mono);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thru-button {
+  appearance: none;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--thru-text);
+  cursor: pointer;
+  background: var(--thru-surface);
+  border: 1px solid var(--thru-border);
+  border-radius: 8px;
+}
+.thru-button:hover {
+  background: color-mix(in oklab, var(--thru-text) 5%, transparent);
+}
+.thru-button-primary {
+  color: var(--thru-accent-text);
+  background: var(--thru-accent);
+  border-color: transparent;
+}
+
+.thru-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  border-radius: 999px;
+}
+.thru-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 999px;
+}
+.thru-status-neutral {
+  color: var(--thru-muted);
+  background: color-mix(in oklab, var(--thru-muted) 14%, transparent);
+}
+.thru-status-pending {
+  color: var(--thru-warning);
+  background: color-mix(in oklab, var(--thru-warning) 14%, transparent);
+}
+.thru-status-success {
+  color: var(--thru-success);
+  background: color-mix(in oklab, var(--thru-success) 14%, transparent);
+}
+.thru-status-danger {
+  color: var(--thru-danger);
+  background: color-mix(in oklab, var(--thru-danger) 14%, transparent);
+}
+
+.thru-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.thru-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--thru-muted);
+}
+.thru-muted {
+  font-size: 13px;
+  color: var(--thru-muted);
+}
