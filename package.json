@@ -17,7 +17,7 @@
   "files": ["dist"],
   "sideEffects": ["**/*.css"],
   "scripts": {
-    "build": "tsc --emitDeclarationOnly && vite build && node scripts/copy-assets.mjs",
+    "build": "vite build && tsc --emitDeclarationOnly && node scripts/copy-assets.mjs",
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit"
   },
