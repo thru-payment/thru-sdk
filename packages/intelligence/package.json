@@ -1,0 +1,30 @@
+{
+  "name": "@thru/intelligence",
+  "version": "0.2.0",
+  "description": "Fund-flow tracing, address labels, investigations and event sources for the thru API.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --sourcemap",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@thru/sdk-core": "^0.2.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

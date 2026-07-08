@@ -1,0 +1,38 @@
+{
+  "name": "thru-sdk",
+  "version": "0.2.0",
+  "description": "The official thru SDK — one typed client for payments, billing, compliance, wallets and more.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "keywords": ["thru", "crypto", "payments", "stablecoin", "usdc", "web3", "sdk"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --sourcemap",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@thru/sdk-core": "^0.2.0",
+    "@thru/payments": "^0.2.0",
+    "@thru/billing": "^0.2.0",
+    "@thru/compliance": "^0.2.0",
+    "@thru/wallet": "^0.2.0",
+    "@thru/platform": "^0.2.0",
+    "@thru/facilitator": "^0.2.0",
+    "@thru/intelligence": "^0.2.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}
