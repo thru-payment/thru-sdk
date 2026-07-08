@@ -14,12 +14,23 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
-  "keywords": ["thru", "crypto", "payments", "stablecoin", "usdc", "web3", "sdk"],
+  "keywords": [
+    "thru",
+    "crypto",
+    "payments",
+    "stablecoin",
+    "usdc",
+    "web3",
+    "sdk"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean --sourcemap",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@thru/sdk-core": "^0.2.0",
@@ -34,5 +45,17 @@
   "devDependencies": {
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thru-payment/thru-sdk.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/thru-payment/thru-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/thru-payment/thru-sdk/issues"
   }
 }

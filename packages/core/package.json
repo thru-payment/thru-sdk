@@ -14,14 +14,29 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean --sourcemap",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thru-payment/thru-sdk.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/thru-payment/thru-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/thru-payment/thru-sdk/issues"
   }
 }
