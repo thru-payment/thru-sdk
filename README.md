@@ -5,30 +5,30 @@ paying:
 
 | Package | You are charging… | Runs in | Docs |
 |---|---|---|---|
-| [`@thru/pay-sdk`](packages/pay-sdk) | a **human** — checkout, subscriptions | the browser (React) | [README](packages/pay-sdk/README.md) |
-| [`@thru/x402`](packages/x402) | a **machine** — AI agents paying per request | your server (Node) | [README](packages/x402/README.md) |
+| [`@thru-payment/pay-sdk`](packages/pay-sdk) | a **human** — checkout, subscriptions | the browser (React) | [README](packages/pay-sdk/README.md) |
+| [`@thru-payment/x402`](packages/x402) | a **machine** — AI agents paying per request | your server (Node) | [README](packages/x402/README.md) |
 
 They are complementary, not alternatives. A merchant taking card-style crypto checkout *and*
 selling an API to agents uses both.
 
-## `@thru/pay-sdk`
+## `@thru-payment/pay-sdk`
 
 Embeddable, themeable checkout and Direct Pay subscribe components. Safe in the browser — it only
 reads public, secret-free endpoints, so your secret API key never leaves your server.
 
 ```tsx
-import { ThruProvider, ThruCheckout } from '@thru/pay-sdk';
-import '@thru/pay-sdk/styles.css';
+import { ThruProvider, ThruCheckout } from '@thru-payment/pay-sdk';
+import '@thru-payment/pay-sdk/styles.css';
 ```
 
-## `@thru/x402`
+## `@thru-payment/x402`
 
 Gate an HTTP route behind a stablecoin payment. The caller gets a `402` with a challenge, signs a
 payment authorization, retries, and thru settles on-chain — the payer needs no gas.
 
 ```ts
-import { createFacilitatorClient } from '@thru/x402';
-import { paymentMiddleware } from '@thru/x402/express';
+import { createFacilitatorClient } from '@thru-payment/x402';
+import { paymentMiddleware } from '@thru-payment/x402/express';
 ```
 
 ## Development
@@ -41,7 +41,7 @@ npm run build          # both packages
 npm run verify         # build + test + smoke, where defined
 ```
 
-`@thru/x402` additionally has `npm run x402:verify`, which builds, unit-tests, **smoke-tests the
+`@thru-payment/x402` additionally has `npm run x402:verify`, which builds, unit-tests, **smoke-tests the
 built artifact under Node's own ESM resolver**, and typechecks the canonical example against the
 published type surface. The unit tests alone are not sufficient — they compile from `src/` and will
 pass against a `dist/` no consumer can import. That is not hypothetical; it is why the smoke test

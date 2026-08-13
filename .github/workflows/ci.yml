@@ -21,13 +21,13 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Build @thru/pay-sdk
+      - name: Build @thru-payment/pay-sdk
         run: npm run pay-sdk:build
 
-      - name: Build @thru/x402
+      - name: Build @thru-payment/x402
         run: npm run x402:build
 
-      - name: Unit tests (@thru/x402)
+      - name: Unit tests (@thru-payment/x402)
         run: npm run x402:test
 
       # The unit tests compile from `src/` through ts-jest and will pass against a `dist/` that no
@@ -36,7 +36,7 @@ jobs:
       # `smoke` loads the built artifact under Node's own resolver and walks every exports subpath;
       # the examples fixture typechecks the canonical integration against the published types.
       - name: Smoke-test the built artifact
-        run: npm --workspace @thru/x402 run smoke
+        run: npm --workspace @thru-payment/x402 run smoke
 
       - name: Typecheck canonical examples
-        run: npm --workspace @thru/x402 run typecheck:examples
+        run: npm --workspace @thru-payment/x402 run typecheck:examples

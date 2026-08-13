@@ -1,5 +1,5 @@
 // Express adapter for the payment gate (spec §8, plan Task 11). Express is an optional peer
-// dependency — this file imports only its types, so `@thru/x402` stays usable without Express
+// dependency — this file imports only its types, so `@thru-payment/x402` stays usable without Express
 // installed (e.g. in the middleware core / WinterCG fetch handler use cases).
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';

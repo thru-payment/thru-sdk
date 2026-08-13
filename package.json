@@ -12,10 +12,10 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "verify": "npm run verify --workspaces --if-present",
-    "pay-sdk:build": "npm --workspace @thru/pay-sdk run build",
-    "x402:build": "npm --workspace @thru/x402 run build",
-    "x402:test": "npm --workspace @thru/x402 run test",
-    "x402:verify": "npm --workspace @thru/x402 run verify"
+    "pay-sdk:build": "npm --workspace @thru-payment/pay-sdk run build",
+    "x402:build": "npm --workspace @thru-payment/x402 run build",
+    "x402:test": "npm --workspace @thru-payment/x402 run test",
+    "x402:verify": "npm --workspace @thru-payment/x402 run verify"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@thru/x402`. Format follows [Keep a Changelog](https://keepachangelog.com);
+All notable changes to `@thru-payment/x402`. Format follows [Keep a Changelog](https://keepachangelog.com);
 versioning follows [semver](https://semver.org).
 
 While the package is `0.x`, minor bumps may carry breaking changes — they are called out explicitly.
@@ -12,7 +12,7 @@ While the package is `0.x`, minor bumps may carry breaking changes — they are 
 - **The published build could not be imported in Node.** `tsconfig` used
   `moduleResolution: "Bundler"` while the package declares `"type": "module"`, so `dist/` shipped
   extensionless relative imports (`export * from './types'`). Node's ESM resolver rejects those,
-  making `import '@thru/x402'` throw `ERR_MODULE_NOT_FOUND` — in the Express-on-Node case the SDK
+  making `import '@thru-payment/x402'` throw `ERR_MODULE_NOT_FOUND` — in the Express-on-Node case the SDK
   exists for. Now compiled with `NodeNext`. The unit suite never caught this because ts-jest
   compiles from `src/`; `npm run smoke` now loads the real build output under Node.
 

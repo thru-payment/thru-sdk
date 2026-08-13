@@ -79,7 +79,7 @@ await check('paymentMiddleware is NOT on the main entry (docs must use the subpa
   assert.equal(
     m.paymentMiddleware,
     undefined,
-    'if this now exists, update the README/console snippets — they tell developers to import it from `@thru/x402/express`',
+    'if this now exists, update the README/console snippets — they tell developers to import it from `@thru-payment/x402/express`',
   );
 });
 

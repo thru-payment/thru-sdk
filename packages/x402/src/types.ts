@@ -1,4 +1,4 @@
-// Shared wire-facing types for the `@thru/x402` merchant SDK.
+// Shared wire-facing types for the `@thru-payment/x402` merchant SDK.
 //
 // This package never depends on `apps/api` code — the shared contract is the wire format itself
 // (spec §8 / plan Task 10). Field names here intentionally mirror

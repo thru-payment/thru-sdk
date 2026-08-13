@@ -1,4 +1,4 @@
-// CANONICAL INTEGRATION EXAMPLE — this file is the source of truth for every `@thru/x402` snippet
+// CANONICAL INTEGRATION EXAMPLE — this file is the source of truth for every `@thru-payment/x402` snippet
 // in the docs and the merchant console. It is typechecked in CI (`npm run typecheck:examples`)
 // against the package's real exported types, so it cannot drift from the API the way hand-written
 // snippets in JSX did. If you change the SDK's surface, this file breaks the build — fix it here
@@ -7,8 +7,8 @@
 // Run: THRU_API_KEY=... npx tsx examples/express-server.ts
 
 import express from 'express';
-import { createFacilitatorClient, type RouteRequirements } from '@thru/x402';
-import { paymentMiddleware } from '@thru/x402/express';
+import { createFacilitatorClient, type RouteRequirements } from '@thru-payment/x402';
+import { paymentMiddleware } from '@thru-payment/x402/express';
 //       ^ NOTE the subpath. `paymentMiddleware` is NOT exported from the package root — the root
 //         entry deliberately carries no Express dependency so the SDK works in WinterCG runtimes.
 

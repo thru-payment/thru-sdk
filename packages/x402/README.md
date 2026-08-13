@@ -1,4 +1,4 @@
-# `@thru/x402`
+# `@thru-payment/x402`
 
 Merchant middleware for charging machines. Gate an HTTP route behind a stablecoin payment: the
 caller gets a `402` with a challenge, signs a payment authorization, retries, and Thru settles
@@ -6,8 +6,8 @@ on-chain. The payer needs no gas — Thru's relayer (BNB) or sponsor (Sui) cover
 
 ```ts
 import express from 'express';
-import { createFacilitatorClient } from '@thru/x402';
-import { paymentMiddleware } from '@thru/x402/express';
+import { createFacilitatorClient } from '@thru-payment/x402';
+import { paymentMiddleware } from '@thru-payment/x402/express';
 
 const facilitator = createFacilitatorClient({ apiKey: process.env.THRU_API_KEY! });
 
@@ -40,19 +40,19 @@ snippet in Thru's docs.
 ## Install
 
 Requires Node ≥ 20. `express` is an optional peer dependency — only needed for the
-`@thru/x402/express` adapter.
+`@thru-payment/x402/express` adapter.
 
 ```bash
-npm install @thru/x402
+npm install @thru-payment/x402
 ```
 
 ## Entry points
 
 | Import | Contains |
 |---|---|
-| `@thru/x402` | `createFacilitatorClient`, `gateRequest`, `buildChallengeHeaders`, `extractPayment`, types |
-| `@thru/x402/express` | `paymentMiddleware` |
-| `@thru/x402/testing` | `createTestAgent` — an internal E2E harness, **not a supported product surface** |
+| `@thru-payment/x402` | `createFacilitatorClient`, `gateRequest`, `buildChallengeHeaders`, `extractPayment`, types |
+| `@thru-payment/x402/express` | `paymentMiddleware` |
+| `@thru-payment/x402/testing` | `createTestAgent` — an internal E2E harness, **not a supported product surface** |
 
 `paymentMiddleware` is deliberately *not* on the root entry: the root carries no Express dependency
 so the SDK stays usable in WinterCG runtimes (Workers, Deno, Bun) via `gateRequest`.

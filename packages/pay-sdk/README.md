@@ -1,4 +1,4 @@
-# @thru/pay-sdk
+# @thru-payment/pay-sdk
 
 Embeddable, **fully themeable** crypto checkout and subscription components for
 [thru](https://thru.la). Drop a payment or Direct Pay subscribe widget into your
@@ -11,12 +11,12 @@ endpoints. Your secret API key never leaves your server.
 ## Install
 
 ```bash
-npm install @thru/pay-sdk
+npm install @thru-payment/pay-sdk
 ```
 
 ```tsx
-import { ThruProvider, ThruCheckout } from '@thru/pay-sdk';
-import '@thru/pay-sdk/styles.css'; // optional default theme
+import { ThruProvider, ThruCheckout } from '@thru-payment/pay-sdk';
+import '@thru-payment/pay-sdk/styles.css'; // optional default theme
 ```
 
 ## How it works
@@ -83,7 +83,7 @@ yourself.
 **4. Fully custom** - build your own layout from the hooks and primitives:
 
 ```tsx
-import { usePayment, ThruRoot, PaymentQRCode, PaymentAddress, PaymentStatusBadge } from '@thru/pay-sdk';
+import { usePayment, ThruRoot, PaymentQRCode, PaymentAddress, PaymentStatusBadge } from '@thru-payment/pay-sdk';
 
 function MyCheckout({ paymentId }: { paymentId: string }) {
   const { data: p } = usePayment(paymentId);
