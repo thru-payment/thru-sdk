@@ -2,7 +2,7 @@
   "name": "@thru/x402",
   "version": "0.1.0",
   "description": "Thru merchant middleware SDK for x402 + MPP payment-required flows: facilitator client, dual-protocol 402 challenge builder, payment gate middleware.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "homepage": "https://thru.la",
   "repository": {
     "type": "git",
@@ -42,7 +42,8 @@
   "files": [
     "dist",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"

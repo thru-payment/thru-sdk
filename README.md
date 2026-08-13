@@ -49,7 +49,7 @@ exists.
 
 ## Publishing
 
-Neither package is on npm yet. Both are scoped `@thru`, which needs the npm org to exist first.
+Both packages are MIT and scoped `@thru`. Neither is on npm yet — that needs the npm org to exist first.
 
 Note that npm does **not** require open source: the published tarball is only what `files` allows
 (`dist` + docs), never the repository or its history. A private repo with a public package is a
