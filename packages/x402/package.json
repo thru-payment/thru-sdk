@@ -1,0 +1,87 @@
+{
+  "name": "@thru/x402",
+  "version": "0.1.0",
+  "description": "Thru merchant middleware SDK for x402 + MPP payment-required flows: facilitator client, dual-protocol 402 challenge builder, payment gate middleware.",
+  "license": "UNLICENSED",
+  "homepage": "https://thru.la",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thru-payment/thru-sdk.git",
+    "directory": "packages/x402"
+  },
+  "bugs": {
+    "url": "https://github.com/thru-payment/thru-sdk/issues"
+  },
+  "keywords": [
+    "x402",
+    "mpp",
+    "http-402",
+    "payments",
+    "stablecoin",
+    "agent-payments",
+    "middleware"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "default": "./dist/express.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/agent-client.d.ts",
+      "default": "./dist/testing/agent-client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
+    "smoke": "node scripts/smoke.mjs",
+    "typecheck:examples": "tsc -p examples/tsconfig.json",
+    "verify": "npm run build && npm run test && npm run smoke && npm run typecheck:examples",
+    "prepublishOnly": "npm run verify"
+  },
+  "peerDependencies": {
+    "ethers": ">=6",
+    "@mysten/sui": ">=2",
+    "express": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "ethers": {
+      "optional": true
+    },
+    "@mysten/sui": {
+      "optional": true
+    },
+    "express": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mysten/sui": "^2.19.0",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.5",
+    "ethers": "^6.17.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,115 +1,57 @@
-# @thru/pay-sdk
+# thru SDKs
 
-Embeddable, **fully themeable** crypto checkout and subscription components for
-[thru](https://thru.la). Drop a payment or Direct Pay subscribe widget into your
-own pages and restyle it to match your brand - from a one-line theme override all
-the way down to a headless render with your own markup.
+Merchant-facing SDKs for [thru](https://thru.la). Two packages, two different jobs — pick by who is
+paying:
 
-It is **safe to run in the browser**: the SDK only reads public, secret-free
-endpoints. Your secret API key never leaves your server.
+| Package | You are charging… | Runs in | Docs |
+|---|---|---|---|
+| [`@thru/pay-sdk`](packages/pay-sdk) | a **human** — checkout, subscriptions | the browser (React) | [README](packages/pay-sdk/README.md) |
+| [`@thru/x402`](packages/x402) | a **machine** — AI agents paying per request | your server (Node) | [README](packages/x402/README.md) |
 
-## Install
+They are complementary, not alternatives. A merchant taking card-style crypto checkout *and*
+selling an API to agents uses both.
 
-```bash
-npm install @thru/pay-sdk
-```
+## `@thru/pay-sdk`
+
+Embeddable, themeable checkout and Direct Pay subscribe components. Safe in the browser — it only
+reads public, secret-free endpoints, so your secret API key never leaves your server.
 
 ```tsx
 import { ThruProvider, ThruCheckout } from '@thru/pay-sdk';
-import '@thru/pay-sdk/styles.css'; // optional default theme
+import '@thru/pay-sdk/styles.css';
 ```
 
-## How it works
+## `@thru/x402`
 
-1. Your **backend** creates a payment (`POST /v1/payments`) or a Direct Pay plan
-   and subscription with your secret key.
-2. You pass the returned **id** to a component.
-3. The component renders the checkout and **polls public status** until it
-   confirms - no secret key in the browser.
+Gate an HTTP route behind a stablecoin payment. The caller gets a `402` with a challenge, signs a
+payment authorization, retries, and thru settles on-chain — the payer needs no gas.
 
-```tsx
-function App() {
-  return (
-    <ThruProvider apiBaseUrl="https://api.thru.la/v1">
-      <ThruCheckout paymentId={paymentId} onStatusChange={(p) => console.log(p.status)} />
-    </ThruProvider>
-  );
-}
+```ts
+import { createFacilitatorClient } from '@thru/x402';
+import { paymentMiddleware } from '@thru/x402/express';
 ```
 
-```tsx
-// Direct Pay subscription
-<DirectPaySubscribe planId={planId} subscriptionId={subscriptionId} />
+## Development
+
+npm workspaces; Node ≥ 20.
+
+```bash
+npm install
+npm run build          # both packages
+npm run verify         # build + test + smoke, where defined
 ```
 
-## Theming - four layers, pick any
+`@thru/x402` additionally has `npm run x402:verify`, which builds, unit-tests, **smoke-tests the
+built artifact under Node's own ESM resolver**, and typechecks the canonical example against the
+published type surface. The unit tests alone are not sufficient — they compile from `src/` and will
+pass against a `dist/` no consumer can import. That is not hypothetical; it is why the smoke test
+exists.
 
-**1. Theme tokens** (quickest):
+## Publishing
 
-```tsx
-<ThruProvider theme={{ colorAccent: '#6d28d9', radius: '20px', fontFamily: 'Inter' }}>
-  ...
-</ThruProvider>
-// or per component:
-<ThruCheckout paymentId={id} theme={{ colorAccent: '#111' }} />
-```
+Neither package is on npm yet. Both are scoped `@thru`, which needs the npm org to exist first.
 
-Tokens: `colorBg, colorSurface, colorBorder, colorText, colorMuted, colorAccent,
-colorAccentText, colorSuccess, colorWarning, colorDanger, radius, fontFamily,
-fontMono, spacing`. Each maps to a `--thru-*` CSS variable you can also set
-yourself.
-
-**2. Per-part `classNames`** (bring your own CSS / Tailwind):
-
-```tsx
-<ThruCheckout
-  paymentId={id}
-  classNames={{
-    root: 'rounded-3xl shadow-xl',
-    header: 'mb-2',
-    qr: 'bg-black',
-    address: 'font-mono text-xs',
-    status: 'uppercase',
-  }}
-/>
-```
-
-**3. Headless** - drop the default classes and style everything yourself:
-
-```tsx
-<ThruCheckout paymentId={id} unstyled classNames={{ root: 'my-checkout' }} />
-```
-
-**4. Fully custom** - build your own layout from the hooks and primitives:
-
-```tsx
-import { usePayment, ThruRoot, PaymentQRCode, PaymentAddress, PaymentStatusBadge } from '@thru/pay-sdk';
-
-function MyCheckout({ paymentId }: { paymentId: string }) {
-  const { data: p } = usePayment(paymentId);
-  if (!p) return null;
-  return (
-    <ThruRoot>
-      <h2>{p.expectedAmount} {p.token}</h2>
-      <PaymentStatusBadge status={p.status} />
-      <PaymentQRCode value={p.paymentAddress} size={240} />
-      <PaymentAddress address={p.paymentAddress} />
-    </ThruRoot>
-  );
-}
-```
-
-You can also pass `renderHeader` / `renderFooter` to `ThruCheckout` for partial
-overrides, and `labels` to customize copy.
-
-## Exports
-
-- Widgets: `ThruCheckout`, `DirectPaySubscribe`
-- Primitives: `ThruRoot`, `PaymentAmount`, `PaymentAddress`, `PaymentQRCode`, `PaymentStatusBadge`
-- Hooks: `usePayment`, `usePlan`, `useSubscription`
-- Client + utils: `createThruClient`, `themeToVars`, `cn`, `toQrDataUrl`, `shorten`, `statusTone`, `formatDuration`
-- Provider: `ThruProvider`, `useThru`
-
-## License
-
-MIT
+Note that npm does **not** require open source: the published tarball is only what `files` allows
+(`dist` + docs), never the repository or its history. A private repo with a public package is a
+normal combination. Publishing a *private package*, however, requires a paid npm plan — a free
+account can only publish public scoped packages.

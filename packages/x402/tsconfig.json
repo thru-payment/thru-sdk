@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    // NodeNext, NOT Bundler: this package declares `"type": "module"` and ships real ESM to
+    // consumers, so Node's resolver requires fully-specified relative imports (`./types.js`).
+    // Under `Bundler` tsc accepted extensionless specifiers and emitted them verbatim, producing a
+    // `dist/` that only loaded inside a bundler — and threw ERR_MODULE_NOT_FOUND in plain Node,
+    // i.e. exactly the Express-on-Node case this SDK exists for.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.spec.ts", "dist"]
+}

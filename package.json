@@ -1,42 +1,23 @@
 {
-  "name": "@thru/pay-sdk",
-  "version": "0.1.0",
-  "description": "Embeddable, fully themeable crypto checkout and subscription components for thru.",
-  "type": "module",
-  "license": "MIT",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./styles.css": "./dist/styles.css"
+  "name": "thru-sdk",
+  "private": true,
+  "description": "Thru's merchant-facing SDKs.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
   },
-  "files": ["dist"],
-  "sideEffects": ["**/*.css"],
   "scripts": {
-    "build": "vite build && tsc --emitDeclarationOnly && node scripts/copy-assets.mjs",
-    "dev": "vite build --watch",
-    "typecheck": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "react": ">=18",
-    "react-dom": ">=18"
-  },
-  "dependencies": {
-    "clsx": "^2.1.1",
-    "qrcode": "^1.5.4"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "verify": "npm run verify --workspaces --if-present",
+    "pay-sdk:build": "npm --workspace @thru/pay-sdk run build",
+    "x402:build": "npm --workspace @thru/x402 run build",
+    "x402:test": "npm --workspace @thru/x402 run test",
+    "x402:verify": "npm --workspace @thru/x402 run verify"
   },
   "devDependencies": {
-    "@types/qrcode": "^1.5.6",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^4.3.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "typescript": "^5.7.2"
   }
 }

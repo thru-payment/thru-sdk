@@ -1,0 +1,20 @@
+{
+  // Typechecks the canonical examples against the BUILT package (via the workspace symlink and the
+  // `exports`/`types` map), not against `src/`. That means it validates exactly what a consumer
+  // resolves — including whether the subpath exports expose the types they claim to.
+  //
+  // Requires `npm run build` first; `npm run verify` sequences them correctly.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["."]
+}

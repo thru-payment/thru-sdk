@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build · test · smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Build @thru/pay-sdk
+        run: npm run pay-sdk:build
+
+      - name: Build @thru/x402
+        run: npm run x402:build
+
+      - name: Unit tests (@thru/x402)
+        run: npm run x402:test
+
+      # The unit tests compile from `src/` through ts-jest and will pass against a `dist/` that no
+      # consumer can import — that exact gap shipped a build throwing ERR_MODULE_NOT_FOUND under
+      # Node's ESM resolver with 28 tests green. These two steps check what merchants receive:
+      # `smoke` loads the built artifact under Node's own resolver and walks every exports subpath;
+      # the examples fixture typechecks the canonical integration against the published types.
+      - name: Smoke-test the built artifact
+        run: npm --workspace @thru/x402 run smoke
+
+      - name: Typecheck canonical examples
+        run: npm --workspace @thru/x402 run typecheck:examples
