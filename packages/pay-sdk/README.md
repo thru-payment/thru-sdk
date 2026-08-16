@@ -8,6 +8,12 @@ the way down to a headless render with your own markup.
 It is **safe to run in the browser**: the SDK only reads public, secret-free
 endpoints. Your secret API key never leaves your server.
 
+> Building your own checkout UI from scratch and don't want any of the components below? The
+> provider, client and hooks are also their own package,
+> [`@thru-payment/checkout-core`](../checkout-core) - install that instead and skip `pay-sdk`'s
+> `qrcode`/`clsx` dependencies entirely. `pay-sdk` depends on it and re-exports everything it has,
+> so you never need both.
+
 ## Install
 
 ```bash
@@ -80,7 +86,9 @@ yourself.
 <ThruCheckout paymentId={id} unstyled classNames={{ root: 'my-checkout' }} />
 ```
 
-**4. Fully custom** - build your own layout from the hooks and primitives:
+**4. Fully custom** - build your own layout from the hooks and primitives (the hooks work the same
+whether you import them from `pay-sdk` or standalone from
+[`@thru-payment/checkout-core`](../checkout-core)):
 
 ```tsx
 import { usePayment, ThruRoot, PaymentQRCode, PaymentAddress, PaymentStatusBadge } from '@thru-payment/pay-sdk';
@@ -106,9 +114,11 @@ overrides, and `labels` to customize copy.
 
 - Widgets: `ThruCheckout`, `DirectPaySubscribe`
 - Primitives: `ThruRoot`, `PaymentAmount`, `PaymentAddress`, `PaymentQRCode`, `PaymentStatusBadge`
-- Hooks: `usePayment`, `usePlan`, `useSubscription`
-- Client + utils: `createThruClient`, `themeToVars`, `cn`, `toQrDataUrl`, `shorten`, `statusTone`, `formatDuration`
-- Provider: `ThruProvider`, `useThru`
+- Utils only `pay-sdk` has: `cn`, `toQrDataUrl` (the `qrcode`/`clsx`-backed ones)
+- Everything else - `usePayment`, `usePlan`, `useSubscription`, `createThruClient`, `themeToVars`,
+  `mergeTheme`, `shorten`, `statusTone`, `statusLabel`, `formatDuration`, `ThruProvider`, `useThru`
+  - is re-exported from [`@thru-payment/checkout-core`](../checkout-core), which you can also
+  import directly if you don't want the components above.
 
 ## License
 

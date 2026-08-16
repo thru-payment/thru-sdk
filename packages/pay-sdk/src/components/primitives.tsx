@@ -1,7 +1,6 @@
 import { type CSSProperties, type ReactNode } from 'react';
 import { cn } from '../cn';
-import { useThru } from '../provider';
-import { mergeTheme, themeToVars, type ThruTheme } from '../theme';
+import { useThru, mergeTheme, themeToVars, type ThruTheme } from '@thru-payment/checkout-core';
 
 /**
  * Hosts the thru CSS variables and base class for a subtree. Wrap custom layouts

@@ -1,17 +1,33 @@
-// Provider + client
-export { ThruProvider, useThru } from './provider';
-export { createThruClient, type ThruClient } from './client';
-
-// Hooks (build fully custom UIs on top of these)
-export { usePayment, usePlan, useSubscription, type AsyncState } from './hooks';
-
-// Theming
-export { themeToVars, mergeTheme, type ThruTheme } from './theme';
+// Headless data layer - provider, client, hooks, theming, types. Re-exported
+// here so existing `@thru-payment/pay-sdk` imports keep working unchanged,
+// but it's also its own package (@thru-payment/checkout-core) for anyone who
+// wants thru's data/state without any of the components below.
+export {
+  ThruProvider,
+  useThru,
+  createThruClient,
+  type ThruClient,
+  usePayment,
+  usePlan,
+  useSubscription,
+  type AsyncState,
+  themeToVars,
+  mergeTheme,
+  type ThruTheme,
+  shorten,
+  statusTone,
+  statusLabel,
+  formatDuration,
+  type StatusTone,
+  type PublicPayment,
+  type PublicPlan,
+  type PublicSubscription,
+  type PublicPaymentTransaction,
+} from '@thru-payment/checkout-core';
 
 // Utilities
 export { cn } from './cn';
 export { toQrDataUrl } from './qr';
-export { shorten, statusTone, statusLabel, formatDuration, type StatusTone } from './format';
 
 // Composable primitives
 export { ThruRoot, partClass } from './components/primitives';
@@ -31,11 +47,3 @@ export {
   type DirectPaySubscribeClassNames,
   type DirectPaySubscribeLabels,
 } from './components/DirectPaySubscribe';
-
-// Types
-export type {
-  PublicPayment,
-  PublicPlan,
-  PublicSubscription,
-  PublicPaymentTransaction,
-} from './types';

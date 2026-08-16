@@ -33,6 +33,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
+    "@thru-payment/checkout-core": "^0.1.0",
     "clsx": "^2.1.1",
     "qrcode": "^1.5.4"
   },

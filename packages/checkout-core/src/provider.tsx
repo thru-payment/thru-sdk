@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { createThruClient, type ThruClient } from './client';
-import type { ThruTheme } from './theme';
+import { createThruClient, type ThruClient } from './client.js';
+import type { ThruTheme } from './theme.js';
 
 const DEFAULT_BASE_URL = 'https://api.thru.la/v1';
 

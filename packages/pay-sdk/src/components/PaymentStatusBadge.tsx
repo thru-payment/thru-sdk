@@ -1,5 +1,5 @@
 import { cn } from '../cn';
-import { statusLabel, statusTone } from '../format';
+import { statusLabel, statusTone } from '@thru-payment/checkout-core';
 import { partClass } from './primitives';
 
 export function PaymentStatusBadge({

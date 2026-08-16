@@ -1,7 +1,5 @@
 import { type CSSProperties } from 'react';
-import { usePlan, useSubscription } from '../hooks';
-import { formatDuration } from '../format';
-import type { ThruTheme } from '../theme';
+import { usePlan, useSubscription, formatDuration, type ThruTheme } from '@thru-payment/checkout-core';
 import { ThruRoot, partClass } from './primitives';
 import { PaymentAddress } from './PaymentAddress';
 import { PaymentQRCode } from './PaymentQRCode';

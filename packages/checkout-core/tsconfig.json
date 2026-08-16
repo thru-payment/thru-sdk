@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    // NodeNext, NOT Bundler: this package declares "type": "module" and ships real ESM straight
+    // out of tsc (no bundler), so Node's own resolver requires fully-specified relative imports
+    // (./types.js). Under Bundler, tsc accepts extensionless specifiers and emits them verbatim,
+    // producing a dist/ that only loads inside a bundler and throws ERR_MODULE_NOT_FOUND in plain
+    // Node - the exact bug @thru-payment/x402's tsconfig.json documents hitting first.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
+    "strict": true,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": false,
+    "types": []
+  },
+  "include": ["src"]
+}

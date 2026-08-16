@@ -1,4 +1,4 @@
-import type { PublicPayment, PublicPlan, PublicSubscription } from './types';
+import type { PublicPayment, PublicPlan, PublicSubscription } from './types.js';
 
 export type ThruClient = {
   baseUrl: string;

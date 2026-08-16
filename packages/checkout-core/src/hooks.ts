@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useThru } from './provider';
-import type { PublicPayment, PublicPlan, PublicSubscription } from './types';
+import { useThru } from './provider.js';
+import type { PublicPayment, PublicPlan, PublicSubscription } from './types.js';
 
 const TERMINAL_PAYMENT = new Set([
   'confirmed', 'settled', 'expired', 'underpaid', 'overpaid', 'failed', 'refunded',

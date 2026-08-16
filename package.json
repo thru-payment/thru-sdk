@@ -9,11 +9,13 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run pay-sdk:build && npm run x402:build",
     "test": "npm run test --workspaces --if-present",
-    "verify": "npm run verify --workspaces --if-present",
-    "pay-sdk:build": "npm --workspace @thru-payment/pay-sdk run build",
-    "pay-sdk:verify": "npm --workspace @thru-payment/pay-sdk run verify",
+    "verify": "npm run pay-sdk:verify && npm run x402:verify",
+    "checkout-core:build": "npm --workspace @thru-payment/checkout-core run build",
+    "checkout-core:verify": "npm --workspace @thru-payment/checkout-core run verify",
+    "pay-sdk:build": "npm run checkout-core:build && npm --workspace @thru-payment/pay-sdk run build",
+    "pay-sdk:verify": "npm run checkout-core:verify && npm --workspace @thru-payment/pay-sdk run verify",
     "x402:build": "npm --workspace @thru-payment/x402 run build",
     "x402:test": "npm --workspace @thru-payment/x402 run test",
     "x402:verify": "npm --workspace @thru-payment/x402 run verify"

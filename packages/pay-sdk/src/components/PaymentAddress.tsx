@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { shorten } from '../format';
+import { shorten } from '@thru-payment/checkout-core';
 import { partClass } from './primitives';
 
 export function PaymentAddress({

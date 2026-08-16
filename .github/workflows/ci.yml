@@ -21,8 +21,23 @@ jobs:
           cache: npm
       - run: npm ci
 
+      - name: Build @thru-payment/checkout-core
+        run: npm run checkout-core:build
+
+      - name: Typecheck @thru-payment/checkout-core
+        run: npm --workspace @thru-payment/checkout-core run typecheck
+
+      # tsc alone (no bundler) will silently emit extensionless relative imports under the wrong
+      # moduleResolution, producing a dist/ that only loads inside a bundler and throws
+      # ERR_MODULE_NOT_FOUND under Node's own resolver — checkout-core hit this exact bug once.
+      - name: Smoke-test @thru-payment/checkout-core
+        run: npm --workspace @thru-payment/checkout-core run smoke
+
       - name: Build @thru-payment/pay-sdk
-        run: npm run pay-sdk:build
+        run: npm --workspace @thru-payment/pay-sdk run build
+
+      - name: Typecheck @thru-payment/pay-sdk
+        run: npm --workspace @thru-payment/pay-sdk run typecheck
 
       - name: Build @thru-payment/x402
         run: npm run x402:build

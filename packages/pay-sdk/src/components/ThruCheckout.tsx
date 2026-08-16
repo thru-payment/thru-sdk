@@ -1,7 +1,5 @@
 import { type CSSProperties, type ReactNode, useEffect, useRef } from 'react';
-import { usePayment } from '../hooks';
-import type { PublicPayment } from '../types';
-import type { ThruTheme } from '../theme';
+import { usePayment, type PublicPayment, type ThruTheme } from '@thru-payment/checkout-core';
 import { ThruRoot, partClass } from './primitives';
 import { PaymentAmount } from './PaymentAmount';
 import { PaymentAddress } from './PaymentAddress';
