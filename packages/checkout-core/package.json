@@ -1,6 +1,6 @@
 {
   "name": "@thru-payment/checkout-core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Headless data layer for thru checkout: client, hooks, provider and types. No pre-built UI, no styling dependencies - bring your own components.",
   "type": "module",
   "license": "MIT",
