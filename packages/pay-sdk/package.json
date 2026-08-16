@@ -25,6 +25,7 @@
     "build": "vite build && tsc --emitDeclarationOnly && node scripts/copy-assets.mjs",
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit",
+    "verify": "npm run build && npm run typecheck",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {

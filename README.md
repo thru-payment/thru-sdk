@@ -47,11 +47,22 @@ published type surface. The unit tests alone are not sufficient — they compile
 pass against a `dist/` no consumer can import. That is not hypothetical; it is why the smoke test
 exists.
 
-## Publishing
+## Releasing
 
-Both packages are MIT and scoped `@thru`. Neither is on npm yet — that needs the npm org to exist first.
+Both packages are MIT, scoped `@thru-payment`, and already on npm
+([`pay-sdk`](https://www.npmjs.com/package/@thru-payment/pay-sdk),
+[`x402`](https://www.npmjs.com/package/@thru-payment/x402)). They're versioned and released
+independently — bumping one never touches the other.
+
+To ship a release, go to **Actions → Release → Run workflow**, pick the package and the version
+bump (patch/minor/major), and run it. The workflow runs the exact same verify gate CI runs on every
+push, then bumps the version, commits + tags it, pushes both back to `main`, and publishes to npm —
+no local `npm publish` from anyone's machine.
+
+One-time setup: add an npm [automation
+token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with publish rights for
+`@thru-payment/*` as the repo secret `NPM_TOKEN` (Settings → Secrets and variables → Actions).
 
 Note that npm does **not** require open source: the published tarball is only what `files` allows
 (`dist` + docs), never the repository or its history. A private repo with a public package is a
-normal combination. Publishing a *private package*, however, requires a paid npm plan — a free
-account can only publish public scoped packages.
+normal combination.
