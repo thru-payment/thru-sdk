@@ -293,6 +293,98 @@ describe('createTestAgent (sui) — sponsored tx construction', () => {
     // Only the initial 402 probe happened — no retry with a broken payload.
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects a sui_sponsored route when no sponsorAddress was configured, before ever building a tx', async () => {
+    const fetchMock = jest.fn(async () => make402Response(suiRoute)) as unknown as typeof fetch;
+    const buildSponsoredTx = jest.fn(async () => ({ txBytesB64: 'x', senderSignatureB64: 'y' }));
+
+    // No sponsorAddress passed — sui_sponsored has no fallback for it.
+    const agent = createTestAgent({ kind: 'sui', keypairSeed: 'test-seed', rpcUrl: 'http://localhost:9000' });
+
+    await expect(
+      agent.fetchWithPayment('https://merchant.example.com/report', {
+        deps: { fetch: fetchMock, buildSponsoredTx } as unknown as never,
+      } as unknown as RequestInit),
+    ).rejects.toThrow(/sponsorAddress/);
+    expect(buildSponsoredTx).not.toHaveBeenCalled();
+  });
+});
+
+describe('createTestAgent (sui) — sui_direct (SIP-58 gasless) construction', () => {
+  const gaslessRoute: RouteRequirements = {
+    scheme: 'sui_direct',
+    chain: 'sui',
+    network: 'testnet',
+    asset: '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC',
+    amountAtomic: 1_000_000n,
+    payTo: '0xMERCHANTSUI0000000000000000000000000000000000000000000000001',
+    resource: 'https://api.example.com/report',
+    maxTimeoutSeconds: 300,
+  };
+
+  it('builds a gasless tx with no sponsor involved, signs it, and retries with scheme=sui_direct', async () => {
+    let capturedHeader: string | undefined;
+
+    const fetchMock = jest.fn(async (_url: unknown, init?: RequestInit) => {
+      if (!init?.headers || !('PAYMENT-SIGNATURE' in (init.headers as Record<string, string>))) {
+        return make402Response(gaslessRoute);
+      }
+      capturedHeader = (init.headers as Record<string, string>)['PAYMENT-SIGNATURE'];
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const buildGaslessTx = jest.fn(async (input: {
+      sender: string;
+      recipient: string;
+      coinType: string;
+      amount: bigint;
+    }) => ({ txBytesB64: 'Z2FzbGVzcw==', senderSignatureB64: 'c2lnbmF0dXJl' }));
+    const buildSponsoredTx = jest.fn();
+
+    // No sponsorAddress — sui_direct doesn't need one.
+    const agent = createTestAgent({ kind: 'sui', keypairSeed: 'test-seed', rpcUrl: 'http://localhost:9000' });
+
+    const response = await agent.fetchWithPayment('https://merchant.example.com/report', {
+      deps: { fetch: fetchMock, buildGaslessTx, buildSponsoredTx } as unknown as never,
+    } as unknown as RequestInit);
+
+    expect(response.status).toBe(200);
+    expect(buildSponsoredTx).not.toHaveBeenCalled();
+    expect(buildGaslessTx).toHaveBeenCalledTimes(1);
+    const call = buildGaslessTx.mock.calls[0][0] as {
+      sender: string;
+      recipient: string;
+      coinType: string;
+      amount: bigint;
+    };
+    expect(call.recipient).toBe(gaslessRoute.payTo);
+    expect(call.coinType).toBe(gaslessRoute.asset);
+    expect(call.amount).toBe(gaslessRoute.amountAtomic);
+    expect(call).not.toHaveProperty('gasOwner');
+
+    expect(capturedHeader).toBeTruthy();
+    const envelope = JSON.parse(Buffer.from(capturedHeader!, 'base64').toString('utf8'));
+    expect(envelope.scheme).toBe('sui_direct');
+    expect(envelope.payload.txBytesB64).toBe('Z2FzbGVzcw==');
+    expect(envelope.payload.senderSignatureB64).toBe('c2lnbmF0dXJl');
+  });
+
+  it('propagates a gasless-build failure without retrying the request', async () => {
+    const fetchMock = jest.fn(async () => make402Response(gaslessRoute)) as unknown as typeof fetch;
+    const buildGaslessTx = jest.fn(async () => {
+      throw new Error('insufficient address balance');
+    });
+
+    const agent = createTestAgent({ kind: 'sui', keypairSeed: 'test-seed', rpcUrl: 'http://localhost:9000' });
+
+    await expect(
+      agent.fetchWithPayment('https://merchant.example.com/report', {
+        deps: { fetch: fetchMock, buildGaslessTx } as unknown as never,
+      } as unknown as RequestInit),
+    ).rejects.toThrow('insufficient address balance');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('createTestAgent — no-402 passthrough', () => {

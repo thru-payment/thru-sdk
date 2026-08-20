@@ -47,7 +47,9 @@ export type SuiAgentOptions = {
   kind: 'sui';
   keypairSeed: string;
   rpcUrl: string;
-  sponsorAddress: string;
+  /** Only needed for the `sui_sponsored` scheme. `sui_direct` (SIP-58 gasless) needs no sponsor —
+   * the payer pays $0 gas directly from their own address balance. */
+  sponsorAddress?: string;
 };
 
 export interface TestAgent {
@@ -69,6 +71,16 @@ export interface SuiAgentDeps {
   buildSponsoredTx(input: {
     sender: string;
     gasOwner: string;
+    recipient: string;
+    coinType: string;
+    amount: bigint;
+  }): Promise<{ txBytesB64: string; senderSignatureB64: string }>;
+  /** `sui_direct` (SIP-58 gasless): builds and signs a $0-gas `balance::send_funds` transaction —
+   * no sponsor, no co-signature. Only ever called for SIP-58-eligible coin types; the merchant's
+   * route configuration (and `/v1/facilitator/supported`) is what decides whether `sui_direct` is
+   * even offered for a given asset. */
+  buildGaslessTx(input: {
+    sender: string;
     recipient: string;
     coinType: string;
     amount: bigint;
@@ -239,7 +251,7 @@ async function defaultEvmDeps(opts: EvmAgentOptions): Promise<EvmAgentDeps> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Sui (sponsored transaction)
+// Sui (sponsored transaction, or SIP-58 gasless direct)
 // ---------------------------------------------------------------------------------------------
 
 function createSuiAgent(opts: SuiAgentOptions): TestAgent {
@@ -262,17 +274,40 @@ function createSuiAgent(opts: SuiAgentOptions): TestAgent {
       const deps = injectedDeps ?? (await defaultSuiDeps(opts));
       const sender = await suiAddress(opts.keypairSeed);
 
-      const { txBytesB64, senderSignatureB64 } = await deps.buildSponsoredTx({
-        sender,
-        gasOwner: opts.sponsorAddress,
-        recipient: requirements.payTo,
-        coinType: requirements.asset,
-        amount: requirements.amountAtomic,
-      });
+      // The merchant's route configuration decides the scheme (it's encoded in the challenge,
+      // not negotiated by the payer) — this just follows whichever one was asked for.
+      let txBytesB64: string;
+      let senderSignatureB64: string;
+      let scheme: 'sui_sponsored' | 'sui_direct';
+
+      if (requirements.scheme === 'sui_direct') {
+        scheme = 'sui_direct';
+        ({ txBytesB64, senderSignatureB64 } = await deps.buildGaslessTx({
+          sender,
+          recipient: requirements.payTo,
+          coinType: requirements.asset,
+          amount: requirements.amountAtomic,
+        }));
+      } else {
+        if (!opts.sponsorAddress) {
+          throw new Error(
+            'sui_sponsored requires sponsorAddress — pass it in createTestAgent({kind:"sui", ...}), ' +
+              'or configure the route for sui_direct if the asset is SIP-58-gasless-eligible.',
+          );
+        }
+        scheme = 'sui_sponsored';
+        ({ txBytesB64, senderSignatureB64 } = await deps.buildSponsoredTx({
+          sender,
+          gasOwner: opts.sponsorAddress,
+          recipient: requirements.payTo,
+          coinType: requirements.asset,
+          amount: requirements.amountAtomic,
+        }));
+      }
 
       const envelope = {
         x402Version: 2,
-        scheme: 'sui_sponsored',
+        scheme,
         network: requirements.network === 'mainnet' ? 'sui:mainnet' : 'sui:testnet',
         payload: { txBytesB64, senderSignatureB64, payer: sender },
       };
@@ -302,10 +337,17 @@ async function suiAddress(seed: string): Promise<string> {
 }
 
 async function defaultSuiDeps(opts: SuiAgentOptions): Promise<SuiAgentDeps> {
-  const { SuiJsonRpcClient } = await import('@mysten/sui/jsonRpc');
+  // gRPC, not the legacy JSON-RPC client: Mysten deprecated legacy JSON-RPC methods
+  // (suix_getBalance, sui_dryRunTransactionBlock, ...) on public fullnodes in favor of
+  // gRPC/GraphQL. `coinWithBalance`/`tx.balance()` need `client.core.getBalance`/`listCoins` to
+  // resolve address-balance sourcing, which throws "Method not found" against a public fullnode
+  // over JSON-RPC — this bit both the existing sui_sponsored path and the new sui_direct one, so
+  // fixed for both. Same host works fine over gRPC (only the JSON-RPC surface was deprecated) —
+  // verified 2026-08-20, see thru-infra's apps/api/src/wallets/sui-wallet.service.ts.
+  const { SuiGrpcClient } = await import('@mysten/sui/grpc');
   const { Transaction, coinWithBalance } = await import('@mysten/sui/transactions');
   const network = opts.rpcUrl.includes('mainnet') ? 'mainnet' : 'testnet';
-  const client = new SuiJsonRpcClient({ url: opts.rpcUrl, network });
+  const client = new SuiGrpcClient({ network, baseUrl: opts.rpcUrl });
   const keypair = await suiKeypair(opts.keypairSeed);
 
   return {
@@ -328,6 +370,58 @@ async function defaultSuiDeps(opts: SuiAgentOptions): Promise<SuiAgentDeps> {
       tx.setGasPayment([]);
       const coin = coinWithBalance({ balance: amount, type: coinType })(tx);
       tx.transferObjects([coin], recipient);
+
+      const built = await tx.build({ client: client as unknown as never });
+      const { bytes, signature } = await keypair.signTransaction(built);
+      return { txBytesB64: bytes, senderSignatureB64: signature };
+    },
+    // sui_direct (SIP-58 gasless): a $0-gas balance::send_funds sourced purely from the payer's
+    // own address balance. No sponsor, no gasOwner, no co-signature — the payer's own signature is
+    // the only one this transaction ever needs.
+    //
+    // Two things the Sui network requires that a normal (gas-paying) transaction doesn't:
+    //  1. A ValidDuring expiration bounded to `currentEpoch .. currentEpoch + 1` — a transaction
+    //     with no owned-object input has no version to pin replay protection against, so the
+    //     network rejects anything wider (a `+2` span, despite the error message saying "at most
+    //     two epochs", is REJECTED — this matches the SDK's own internal reference for
+    //     addressBalance gas mode, transactions/executor/serial.mjs #getValidDuringExpiration).
+    //  2. The tx must be built ONCE and those exact bytes signed/executed — handing the
+    //     `Transaction` object itself (unbuilt) to something that calls `.build()` again re-runs
+    //     the resolver plugins and silently resets the zeroed gas fields and the expiration you
+    //     just set. `tx.build({client})` here, then `keypair.signTransaction(builtBytes)` on
+    //     those exact bytes, sidesteps that.
+    //
+    // Verified end-to-end on Sui testnet 2026-08-20 with real Circle-issued testnet USDC:
+    // gasUsed all-zero, sender's SUI balance unchanged before/after.
+    async buildGaslessTx({ sender, recipient, coinType, amount }) {
+      const { response: info } = await client.ledgerService.getServiceInfo({});
+      if (!info.chainId) {
+        throw new Error('getServiceInfo did not return a chainId — cannot build a ValidDuring expiration');
+      }
+      const currentEpoch = BigInt(info.epoch ?? 0);
+      const chainId = info.chainId;
+
+      const tx = new Transaction();
+      tx.setSender(sender);
+      const bal = tx.balance({ type: coinType, balance: amount });
+      tx.moveCall({
+        target: '0x2::balance::send_funds',
+        typeArguments: [coinType],
+        arguments: [bal, tx.pure.address(recipient)],
+      });
+      tx.setGasBudget(0);
+      tx.setGasPrice(0);
+      tx.setGasPayment([]);
+      tx.setExpiration({
+        ValidDuring: {
+          minEpoch: String(currentEpoch),
+          maxEpoch: String(currentEpoch + 1n),
+          minTimestamp: null,
+          maxTimestamp: null,
+          chain: chainId,
+          nonce: (Math.random() * 4294967296) >>> 0,
+        },
+      });
 
       const built = await tx.build({ client: client as unknown as never });
       const { bytes, signature } = await keypair.signTransaction(built);

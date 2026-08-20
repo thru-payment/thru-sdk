@@ -6,7 +6,7 @@
 // implementations stay aligned, but there is no import relationship between them.
 
 export type Protocol = 'x402' | 'mpp';
-export type Scheme = 'permit2_exact' | 'sui_sponsored';
+export type Scheme = 'permit2_exact' | 'sui_sponsored' | 'sui_direct';
 export type Chain = 'bnb' | 'sui';
 export type Network = 'mainnet' | 'testnet';
 
