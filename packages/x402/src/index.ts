@@ -3,3 +3,4 @@ export * from './types.js';
 export * from './client.js';
 export * from './challenge.js';
 export * from './middleware.js';
+export * from './sui-routing.js';
