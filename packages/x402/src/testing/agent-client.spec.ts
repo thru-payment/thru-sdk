@@ -3,7 +3,12 @@ import { verifyTypedData, Wallet } from 'ethers';
 import { createTestAgent } from './agent-client.js';
 import { buildChallengeHeaders } from '../challenge.js';
 import type { RouteRequirements } from '../types.js';
-import { PERMIT2_DOMAIN_NAME, PERMIT2_ADDRESS, PERMIT_TRANSFER_FROM_TYPES } from './agent-client.js';
+import {
+  PERMIT2_DOMAIN_NAME,
+  PERMIT2_ADDRESS,
+  PERMIT_TRANSFER_FROM_TYPES,
+  TRANSFER_WITH_AUTHORIZATION_TYPES,
+} from './agent-client.js';
 
 // Construction-logic-only tests (plan Task 12 Step 1): no live chain calls. All network/RPC
 // interactions the agent client would normally make (allowance checks, one-time approve,
@@ -191,6 +196,84 @@ describe('createTestAgent (evm) — permit construction', () => {
     const body = await response.json();
     expect(body).toEqual({ report: 'contents' });
     expect(response.headers.get('PAYMENT-RESPONSE')).toBe('abc');
+  });
+});
+
+describe('createTestAgent (evm) — eip3009_exact construction', () => {
+  const privateKey = '0x' + '22'.repeat(32);
+  const wallet = new Wallet(privateKey);
+  const eip3009Route: RouteRequirements = { ...evmRoute, scheme: 'eip3009_exact' };
+  const domain = { name: 'Global Dollar', version: '1' };
+
+  it('signs a TransferWithAuthorization over the TOKEN domain whose recovered signer matches the agent wallet', async () => {
+    let capturedHeader: string | undefined;
+
+    const fetchMock = jest.fn(async (_url: unknown, init?: RequestInit) => {
+      if (!init?.headers || !('PAYMENT-SIGNATURE' in (init.headers as Record<string, string>))) {
+        return make402Response(eip3009Route);
+      }
+      capturedHeader = (init.headers as Record<string, string>)['PAYMENT-SIGNATURE'];
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const ensureAllowance = jest.fn(async () => undefined);
+    const agent = createTestAgent({ kind: 'evm', privateKey, rpcUrl: 'http://localhost:8545' });
+
+    const response = await agent.fetchWithPayment('https://merchant.example.com/report', {
+      deps: {
+        fetch: fetchMock,
+        ensureAllowance,
+        spenderFor: jest.fn(async () => {
+          throw new Error('should never be called for eip3009_exact');
+        }),
+        eip3009DomainFor: jest.fn(async () => domain),
+      } as unknown as never,
+    } as unknown as RequestInit);
+
+    expect(response.status).toBe(200);
+    // The whole point of eip3009_exact: no on-chain approve, ever.
+    expect(ensureAllowance).not.toHaveBeenCalled();
+
+    const envelope = JSON.parse(Buffer.from(capturedHeader!, 'base64').toString('utf8'));
+    expect(envelope.scheme).toBe('eip3009_exact');
+    expect(envelope.payload.payer.toLowerCase()).toBe(wallet.address.toLowerCase());
+
+    const { auth, signature } = envelope.payload;
+    const typedDomain = { name: domain.name, version: domain.version, chainId: 97, verifyingContract: auth.token };
+    const value = {
+      from: auth.from,
+      to: auth.to,
+      value: BigInt(auth.value),
+      validAfter: BigInt(auth.validAfter),
+      validBefore: BigInt(auth.validBefore),
+      nonce: auth.nonce,
+    };
+    const recovered = verifyTypedData(typedDomain, TRANSFER_WITH_AUTHORIZATION_TYPES, value, signature);
+    expect(recovered.toLowerCase()).toBe(wallet.address.toLowerCase());
+    expect(auth.to.toLowerCase()).toBe(eip3009Route.payTo.toLowerCase());
+    expect(auth.token.toLowerCase()).toBe(eip3009Route.asset.toLowerCase());
+    expect(auth.value).toBe(eip3009Route.amountAtomic.toString());
+    expect(auth.validAfter).toBe('0');
+  });
+
+  it('propagates a missing eip3009 domain without retrying the request', async () => {
+    const fetchMock = jest.fn(async () => make402Response(eip3009Route)) as unknown as typeof fetch;
+    const agent = createTestAgent({ kind: 'evm', privateKey, rpcUrl: 'http://localhost:8545' });
+
+    await expect(
+      agent.fetchWithPayment('https://merchant.example.com/report', {
+        deps: {
+          fetch: fetchMock,
+          ensureAllowance: jest.fn(),
+          spenderFor: jest.fn(),
+          eip3009DomainFor: jest.fn(async () => {
+            throw new Error('no eip3009 domain advertised');
+          }),
+        } as unknown as never,
+      } as unknown as RequestInit),
+    ).rejects.toThrow('no eip3009 domain advertised');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1); // only the initial 402 probe, no retry
   });
 });
 

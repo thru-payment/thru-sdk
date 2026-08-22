@@ -7,7 +7,7 @@
 // Run: THRU_API_KEY=... npx tsx examples/express-server.ts
 
 import express from 'express';
-import { createFacilitatorClient, resolveSuiRoute, type RouteRequirements } from '@thru-payment/x402';
+import { createFacilitatorClient, resolveEvmRoute, resolveSuiRoute, type RouteRequirements } from '@thru-payment/x402';
 import { paymentMiddleware } from '@thru-payment/x402/express';
 //       ^ NOTE the subpath. `paymentMiddleware` is NOT exported from the package root — the root
 //         entry deliberately carries no Express dependency so the SDK works in WinterCG runtimes.
@@ -22,6 +22,7 @@ const facilitator = createFacilitatorClient({
 const BNB_USDT = '0x55d398326f99059fF775485246999027B3197955';
 const BNB_USDT_DECIMALS = 18; // NB: 18 on BNB Chain, unlike USDT's 6 on most other chains.
 const SUI_USDC = '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC';
+const ROBINHOOD_USDG = '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168';
 
 function atomic(human: string, decimals: number): bigint {
   const [whole, frac = ''] = human.split('.');
@@ -56,6 +57,19 @@ async function main() {
       resource: '/reports/quarterly',
       maxTimeoutSeconds: 300,
     }),
+    // `resolveEvmRoute` is the same idea for bnb/robinhood: `eip3009_exact` (the token verifies the
+    // signature itself — no approve, ever) when the facilitator has confirmed EIP-3009 domain info
+    // for this asset, `permit2_exact` (works with any ERC-20, but needs a one-time payer approve)
+    // otherwise. Pass `{ allowPermit2: false }` if your payers must never see an approve step.
+    'GET /reports/annual': await resolveEvmRoute(facilitator, {
+      chain: 'robinhood',
+      network: 'mainnet',
+      asset: ROBINHOOD_USDG,
+      amountAtomic: atomic('5.00', 6),
+      payTo: process.env.THRU_ROBINHOOD_SETTLEMENT_ADDRESS!,
+      resource: '/reports/annual',
+      maxTimeoutSeconds: 300,
+    }),
   };
 
   const app = express();
@@ -78,6 +92,9 @@ async function main() {
     res.json({ report: '…' });
   });
   app.get('/reports/quarterly', (_req, res) => {
+    res.json({ report: '…' });
+  });
+  app.get('/reports/annual', (_req, res) => {
     res.json({ report: '…' });
   });
 

@@ -6,8 +6,8 @@
 // implementations stay aligned, but there is no import relationship between them.
 
 export type Protocol = 'x402' | 'mpp';
-export type Scheme = 'permit2_exact' | 'sui_sponsored' | 'sui_direct';
-export type Chain = 'bnb' | 'sui';
+export type Scheme = 'permit2_exact' | 'eip3009_exact' | 'sui_sponsored' | 'sui_direct';
+export type Chain = 'bnb' | 'robinhood' | 'sui';
 export type Network = 'mainnet' | 'testnet';
 
 /** What a merchant route charges — the SDK-side counterpart of `PaymentRequirements`. */
@@ -48,6 +48,10 @@ export interface SupportedAssetBnb {
   symbol: string;
   decimals: number;
   maxPaymentAtomic: string;
+  /** Present only under an `eip3009_exact` kind — the token's own EIP-712 domain identity, needed
+   * to construct a valid `TransferWithAuthorization` signature. Per-asset, not per-kind, because
+   * each token contract defines its own `name`/`version`. */
+  eip3009?: { name: string; version: string };
 }
 
 export interface SupportedAssetSui {

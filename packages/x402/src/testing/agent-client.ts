@@ -32,9 +32,22 @@ export const PERMIT_TRANSFER_FROM_TYPES: Record<string, Array<{ name: string; ty
   ],
 };
 
-const CHAIN_ID_BY_NETWORK: Record<'mainnet' | 'testnet', number> = {
-  mainnet: 56,
-  testnet: 97,
+/** EIP-712 types for `TransferWithAuthorization` — canonical EIP-3009 shape, mirrors the API-side
+ * scheme exactly (apps/api/.../eip3009-exact.scheme.ts#TRANSFER_WITH_AUTHORIZATION_TYPES). */
+export const TRANSFER_WITH_AUTHORIZATION_TYPES: Record<string, Array<{ name: string; type: string }>> = {
+  TransferWithAuthorization: [
+    { name: 'from', type: 'address' },
+    { name: 'to', type: 'address' },
+    { name: 'value', type: 'uint256' },
+    { name: 'validAfter', type: 'uint256' },
+    { name: 'validBefore', type: 'uint256' },
+    { name: 'nonce', type: 'bytes32' },
+  ],
+};
+
+const CHAIN_ID_BY_CHAIN_NETWORK: Record<'bnb' | 'robinhood', Record<'mainnet' | 'testnet', number>> = {
+  bnb: { mainnet: 56, testnet: 97 },
+  robinhood: { mainnet: 4663, testnet: 46630 },
 };
 
 const ERC20_ABI = [
@@ -42,7 +55,13 @@ const ERC20_ABI = [
   'function approve(address spender, uint256 amount) external returns (bool)',
 ];
 
-export type EvmAgentOptions = { kind: 'evm'; privateKey: string; rpcUrl: string };
+export type EvmAgentOptions = {
+  kind: 'evm';
+  privateKey: string;
+  rpcUrl: string;
+  /** Defaults to 'bnb' — set 'robinhood' when paying a Robinhood Chain route. */
+  chain?: 'bnb' | 'robinhood';
+};
 export type SuiAgentOptions = {
   kind: 'sui';
   keypairSeed: string;
@@ -59,10 +78,15 @@ export interface TestAgent {
 /** Injectable EVM dependencies — real ethers calls by default, stubbed in unit tests. */
 export interface EvmAgentDeps {
   fetch: typeof fetch;
-  /** Ensure the payer has approved Permit2 for at least `amount` of `token` (one-time approve). */
+  /** Ensure the payer has approved Permit2 for at least `amount` of `token` (one-time approve).
+   * Only ever called for `permit2_exact` — `eip3009_exact` needs no allowance at all. */
   ensureAllowance(input: { token: string; owner: string; amount: bigint }): Promise<void>;
   /** Resolve the Permit2 `spender` address (Thru's relayer) for the target resource server. */
   spenderFor(url: string, requirements: RouteRequirements): Promise<string>;
+  /** Resolve the token's own EIP-712 domain identity for an `eip3009_exact` route — an operator-
+   * confirmed value the facilitator quotes back via `/v1/facilitator/supported`, never guessed
+   * client-side (see registry/facilitator-token.registry.ts#Eip3009Domain). */
+  eip3009DomainFor(url: string, requirements: RouteRequirements): Promise<{ name: string; version: string }>;
 }
 
 /** Injectable Sui dependencies — real `@mysten/sui` calls by default, stubbed in unit tests. */
@@ -112,6 +136,8 @@ export function createTestAgent(opts: EvmAgentOptions | SuiAgentOptions): TestAg
 // ---------------------------------------------------------------------------------------------
 
 function createEvmAgent(opts: EvmAgentOptions): TestAgent {
+  const chain = opts.chain ?? 'bnb';
+
   return {
     async fetchWithPayment(url: string, init?: RequestInit): Promise<Response> {
       const { deps: injectedDeps, ...restInit } = (init ?? {}) as EvmFetchInit;
@@ -128,33 +154,69 @@ function createEvmAgent(opts: EvmAgentOptions): TestAgent {
       }
       const requirements = decodeRequirementsFromHeader(challenge);
 
-      const deps = injectedDeps ?? (await defaultEvmDeps(opts));
-      const spender = await deps.spenderFor(url, requirements);
-
-      await deps.ensureAllowance({
-        token: requirements.asset,
-        owner: await evmAddress(opts.privateKey),
-        amount: requirements.amountAtomic,
-      });
-
-      const nonce = randomUint256();
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + requirements.maxTimeoutSeconds);
-
-      const signature = await signPermit(opts.privateKey, {
-        token: requirements.asset,
-        amount: requirements.amountAtomic,
-        spender,
-        nonce,
-        deadline,
-        chainId: CHAIN_ID_BY_NETWORK[requirements.network],
-      });
-
+      const deps = injectedDeps ?? (await defaultEvmDeps(opts, chain));
       const payer = await evmAddress(opts.privateKey);
-      const envelope = {
-        x402Version: 2,
-        scheme: 'permit2_exact',
-        network: requirements.network === 'mainnet' ? 'eip155:56' : 'eip155:97',
-        payload: {
+      const chainId = CHAIN_ID_BY_CHAIN_NETWORK[chain][requirements.network];
+      const caip2 = `eip155:${chainId}`;
+
+      // The merchant's route configuration decides the scheme (it's encoded in the challenge, not
+      // negotiated by the payer) — this just follows whichever one was asked for. Use
+      // `resolveEvmRoute` on the merchant side to avoid hand-picking this in the first place.
+      let payload: Record<string, unknown>;
+      let scheme: 'eip3009_exact' | 'permit2_exact';
+
+      if (requirements.scheme === 'eip3009_exact') {
+        scheme = 'eip3009_exact';
+        const domain = await deps.eip3009DomainFor(url, requirements);
+        const nonce = '0x' + randomBytes(32).toString('hex');
+        const validAfter = 0n;
+        const validBefore = BigInt(Math.floor(Date.now() / 1000) + requirements.maxTimeoutSeconds);
+
+        const signature = await signTransferAuthorization(opts.privateKey, {
+          token: requirements.asset,
+          from: payer,
+          to: requirements.payTo,
+          value: requirements.amountAtomic,
+          validAfter,
+          validBefore,
+          nonce,
+          chainId,
+          domainName: domain.name,
+          domainVersion: domain.version,
+        });
+
+        payload = {
+          auth: {
+            token: requirements.asset,
+            from: payer,
+            to: requirements.payTo,
+            value: requirements.amountAtomic.toString(),
+            validAfter: validAfter.toString(),
+            validBefore: validBefore.toString(),
+            nonce,
+          },
+          signature,
+          payer,
+        };
+      } else if (requirements.scheme === 'permit2_exact') {
+        scheme = 'permit2_exact';
+        const spender = await deps.spenderFor(url, requirements);
+
+        await deps.ensureAllowance({ token: requirements.asset, owner: payer, amount: requirements.amountAtomic });
+
+        const nonce = randomUint256();
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + requirements.maxTimeoutSeconds);
+
+        const signature = await signPermit(opts.privateKey, {
+          token: requirements.asset,
+          amount: requirements.amountAtomic,
+          spender,
+          nonce,
+          deadline,
+          chainId,
+        });
+
+        payload = {
           permit: {
             token: requirements.asset,
             amount: requirements.amountAtomic.toString(),
@@ -164,8 +226,12 @@ function createEvmAgent(opts: EvmAgentOptions): TestAgent {
           transferTo: requirements.payTo,
           signature,
           payer,
-        },
-      };
+        };
+      } else {
+        throw new Error(`createEvmAgent can't pay an EVM route with scheme "${requirements.scheme}"`);
+      }
+
+      const envelope = { x402Version: 2, scheme, network: caip2, payload };
       const paymentSignature = Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64');
 
       return doFetch(url, {
@@ -209,10 +275,62 @@ async function signPermit(
   return wallet.signTypedData(domain, PERMIT_TRANSFER_FROM_TYPES, value);
 }
 
-async function defaultEvmDeps(opts: EvmAgentOptions): Promise<EvmAgentDeps> {
+async function signTransferAuthorization(
+  privateKey: string,
+  fields: {
+    token: string;
+    from: string;
+    to: string;
+    value: bigint;
+    validAfter: bigint;
+    validBefore: bigint;
+    nonce: string;
+    chainId: number;
+    domainName: string;
+    domainVersion: string;
+  },
+): Promise<string> {
+  const { Wallet } = await import('ethers');
+  const wallet = new Wallet(privateKey);
+  // Domain is the TOKEN's own — contrast signPermit's fixed Permit2 domain above.
+  const domain = {
+    name: fields.domainName,
+    version: fields.domainVersion,
+    chainId: fields.chainId,
+    verifyingContract: fields.token,
+  };
+  const value = {
+    from: fields.from,
+    to: fields.to,
+    value: fields.value,
+    validAfter: fields.validAfter,
+    validBefore: fields.validBefore,
+    nonce: fields.nonce,
+  };
+  return wallet.signTypedData(domain, TRANSFER_WITH_AUTHORIZATION_TYPES, value);
+}
+
+async function defaultEvmDeps(opts: EvmAgentOptions, chain: 'bnb' | 'robinhood'): Promise<EvmAgentDeps> {
   const { Contract, JsonRpcProvider, Wallet } = await import('ethers');
   const provider = new JsonRpcProvider(opts.rpcUrl);
   const wallet = new Wallet(opts.privateKey, provider);
+
+  async function supportedKinds(url: string): Promise<
+    Array<{
+      chain: string;
+      scheme: string;
+      extra?: { spender?: string | null };
+      assets: Array<{ address?: string; eip3009?: { name: string; version: string } }>;
+    }>
+  > {
+    const origin = new URL(url).origin;
+    const response = await fetch(`${origin}/v1/facilitator/supported`);
+    if (!response.ok) {
+      throw new Error(`Failed to look up facilitator capabilities: HTTP ${response.status}`);
+    }
+    const body = (await response.json()) as { kinds: Awaited<ReturnType<typeof supportedKinds>> };
+    return body.kinds;
+  }
 
   return {
     fetch,
@@ -221,19 +339,21 @@ async function defaultEvmDeps(opts: EvmAgentOptions): Promise<EvmAgentDeps> {
       // `/v1/facilitator/supported` on the same origin as the resource, per spec §7's
       // `extra.spender`. E2E callers typically inject a deps override that already knows the
       // relayer address instead of relying on this default.
-      const origin = new URL(url).origin;
-      const response = await fetch(`${origin}/v1/facilitator/supported`);
-      if (!response.ok) {
-        throw new Error(`Failed to look up facilitator spender: HTTP ${response.status}`);
-      }
-      const body = (await response.json()) as {
-        kinds: Array<{ chain: string; extra?: { spender?: string | null } }>;
-      };
-      const kind = body.kinds.find((k) => k.chain === 'bnb' && k.extra?.spender);
+      const kinds = await supportedKinds(url);
+      const kind = kinds.find((k) => k.chain === chain && k.scheme === 'permit2_exact' && k.extra?.spender);
       if (!kind?.extra?.spender) {
-        throw new Error('No BNB permit2 spender advertised by /v1/facilitator/supported');
+        throw new Error(`No ${chain} permit2 spender advertised by /v1/facilitator/supported`);
       }
       return kind.extra.spender;
+    },
+    async eip3009DomainFor(url: string, requirements: RouteRequirements): Promise<{ name: string; version: string }> {
+      const kinds = await supportedKinds(url);
+      const kind = kinds.find((k) => k.chain === chain && k.scheme === 'eip3009_exact');
+      const asset = kind?.assets.find((a) => a.address?.toLowerCase() === requirements.asset.toLowerCase());
+      if (!asset?.eip3009) {
+        throw new Error(`No eip3009 domain for ${requirements.asset} advertised by /v1/facilitator/supported`);
+      }
+      return asset.eip3009;
     },
     async ensureAllowance({ token, amount }): Promise<void> {
       const erc20 = new Contract(token, ERC20_ABI, wallet) as unknown as {
