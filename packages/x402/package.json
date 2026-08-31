@@ -37,6 +37,14 @@
       "types": "./dist/testing/agent-client.d.ts",
       "default": "./dist/testing/agent-client.js"
     },
+    "./payer": {
+      "types": "./dist/payer.d.ts",
+      "default": "./dist/payer.js"
+    },
+    "./verify-payer-broadcast": {
+      "types": "./dist/verify-payer-broadcast.d.ts",
+      "default": "./dist/verify-payer-broadcast.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

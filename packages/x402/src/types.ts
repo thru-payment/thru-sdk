@@ -41,6 +41,15 @@ export interface SettleResponseBody {
   txHash?: string;
   reason?: string;
   paymentId?: string;
+  /**
+   * Whether the facilitator actually submitted a transaction — a hard guarantee, not a best-effort
+   * guess (mirrors `apps/api/.../protocols/normalized.types.ts#SettleResult.settlementState`).
+   * `not_broadcast` means nothing was sent, full stop — the ONLY condition under which resubmitting
+   * the same authorization through another path (see `./payer.js`'s `settleWithPayerGas` for
+   * `eip3009_exact`) is safe. Treat `broadcast` and an absent value identically: never assume it's
+   * safe to resubmit.
+   */
+  settlementState?: 'not_broadcast' | 'broadcast';
 }
 
 export interface SupportedAssetBnb {
@@ -61,13 +70,37 @@ export interface SupportedAssetSui {
   maxPaymentAtomic: string;
 }
 
+/**
+ * How a client may get a signed authorization onto the chain (mirrors
+ * `apps/api/.../facilitator-public.controller.ts#SettlementMode`). `facilitator_broadcast` is
+ * always available when a kind is advertised at all. `payer_broadcast_fallback` — the payer's own
+ * wallet can submit the SAME already-signed authorization directly, no relayer involved — only
+ * ever appears for `eip3009_exact`: unlike Permit2 (whose signed `spender` field IS checked
+ * against `msg.sender` on-chain, so only Thru's relayer can ever submit one), an EIP-3009
+ * signature isn't bound to a specific submitter. See `./payer.js`'s `settleWithPayerGas`.
+ */
+export type SettlementMode = 'facilitator_broadcast' | 'payer_broadcast_fallback';
+
 export interface SupportedKind {
   protocol: Protocol;
   scheme: Scheme;
   chain: Chain;
   network: Network;
   assets: Array<SupportedAssetBnb | SupportedAssetSui>;
-  extra: { spender?: string | null; gasOwner?: string | null };
+  /** Absent on older facilitator versions — treat as `['facilitator_broadcast']` if so. */
+  settlementModes?: SettlementMode[];
+  extra: {
+    spender?: string | null;
+    gasOwner?: string | null;
+    /**
+     * Whether the relayer this kind depends on can currently afford one more settle — read live,
+     * not cached, so a client can check readiness *before* asking a payer to sign anything rather
+     * than only discovering `gas_tank_empty` after a failed settle(). Only ever present on the EVM
+     * kinds (permit2_exact/eip3009_exact); absent means "not tracked for this kind" (e.g. the Sui
+     * kinds), not "not ready" — check for `=== false` specifically, not falsiness.
+     */
+    gasReady?: boolean;
+  };
 }
 
 export interface SupportedKinds {
