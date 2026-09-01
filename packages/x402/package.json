@@ -1,6 +1,6 @@
 {
   "name": "@thru-payment/x402",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Thru merchant middleware SDK for x402 + MPP payment-required flows: facilitator client, dual-protocol 402 challenge builder, payment gate middleware.",
   "license": "MIT",
   "homepage": "https://thru.la",
