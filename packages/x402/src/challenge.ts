@@ -6,9 +6,24 @@
 // `apps/api/src/facilitator/protocols/x402.codec.ts` / `mpp.codec.ts` — the SDK never imports
 // `apps/api` code (spec §8, Task 10 note). Keep field names in sync with those codecs; any
 // [PIN] wire-format changes made there must be mirrored here.
+//
+// The x402 base64(JSON) envelope itself lives in `./wire.js` (one encoder, shared with
+// `middleware.ts`, pinned by golden vectors in `wire.spec.ts`). What remains here is the MPP
+// `WWW-Authenticate` challenge — HMAC-bound `key="value"` params, a different wire shape with a
+// single call site — plus the inbound header extraction.
 
 import { createHmac } from 'node:crypto';
+import { encodeRequirementsEnvelope } from './wire.js';
 import type { RouteRequirements } from './types.js';
+
+/**
+ * Decode a `PAYMENT-REQUIRED` base64(JSON) envelope back into route requirements, for testing
+ * the roundtrip and for internal use by the testing agent client.
+ *
+ * Re-exported from `./wire.js`, which owns every base64(JSON) envelope shape in this package.
+ * The name and behaviour here are the published public API — do not rename.
+ */
+export { decodeRequirementsEnvelope as decodeRequirementsFromHeader } from './wire.js';
 
 const BOUND_PARAM_KEYS = [
   'intent',
@@ -30,46 +45,6 @@ function canonicalBoundParamString(params: BoundParams): string {
 
 function computeBinding(params: BoundParams, hmacSecret: string): string {
   return createHmac('sha256', hmacSecret).update(canonicalBoundParamString(params)).digest('hex');
-}
-
-/**
- * Encode `RouteRequirements` to the base64(JSON) envelope carried in the `PAYMENT-REQUIRED`
- * header. Mirrors `x402.codec.ts#encodeRequirements`. Bigints are serialized as decimal strings.
- */
-function encodeX402Requirements(req: RouteRequirements): string {
-  const envelope = {
-    protocol: 'x402' as const,
-    scheme: req.scheme,
-    chain: req.chain,
-    network: req.network,
-    asset: req.asset,
-    amountAtomic: req.amountAtomic.toString(),
-    payTo: req.payTo,
-    resource: req.resource,
-    maxTimeoutSeconds: req.maxTimeoutSeconds,
-    extra: req.extra ?? {},
-  };
-  return Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64');
-}
-
-/**
- * Decode a `PAYMENT-REQUIRED` base64(JSON) envelope back into route requirements, for testing
- * the roundtrip and for internal use by the testing agent client.
- */
-export function decodeRequirementsFromHeader(b64: string): RouteRequirements & { protocol: 'x402' } {
-  const parsed = JSON.parse(Buffer.from(b64, 'base64').toString('utf8')) as Record<string, unknown>;
-  return {
-    protocol: 'x402',
-    scheme: parsed.scheme as RouteRequirements['scheme'],
-    chain: parsed.chain as RouteRequirements['chain'],
-    network: parsed.network as RouteRequirements['network'],
-    asset: parsed.asset as string,
-    amountAtomic: BigInt(parsed.amountAtomic as string),
-    payTo: parsed.payTo as string,
-    resource: parsed.resource as string,
-    maxTimeoutSeconds: parsed.maxTimeoutSeconds as number,
-    extra: (parsed.extra as Record<string, unknown>) ?? {},
-  };
 }
 
 /**
@@ -114,7 +89,7 @@ export function buildChallengeHeaders(
   opts?: { mppSecret?: string },
 ): Record<string, string> {
   const headers: Record<string, string> = {
-    'PAYMENT-REQUIRED': encodeX402Requirements(req),
+    'PAYMENT-REQUIRED': encodeRequirementsEnvelope(req),
   };
   if (opts?.mppSecret) {
     headers['WWW-Authenticate'] = buildMppChallenge(req, opts.mppSecret);

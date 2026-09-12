@@ -470,6 +470,133 @@ describe('createTestAgent (sui) — sui_direct (SIP-58 gasless) construction', (
   });
 });
 
+describe('createTestAgent — PAYMENT-SIGNATURE envelope shape', () => {
+  // Both chain families now build this envelope through one shared 402 handshake
+  // (`fetchWithPaymentHandshake` + `wire.ts#encodePaymentEnvelope`) instead of a per-family copy.
+  // What the facilitator's `x402.codec.ts#decodePaymentSignature` destructures is the field NAMES
+  // and nesting below; the signature the payer just produced is only verifiable if they survive
+  // intact, so they are pinned here rather than left to the shared helper's own tests.
+  const privateKey = '0x' + '22'.repeat(32);
+  const relayerSpender = '0x333333333333333333333333333333333333333C';
+
+  function captureEnvelope(): {
+    fetchMock: typeof fetch;
+    read: () => Record<string, any>;
+  } {
+    let header: string | undefined;
+    const fetchMock = jest.fn(async (_url: unknown, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string> | undefined;
+      if (!headers || !('PAYMENT-SIGNATURE' in headers)) {
+        return new Response(null, { status: 402, headers: {} });
+      }
+      header = headers['PAYMENT-SIGNATURE'];
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as unknown as typeof fetch;
+    return {
+      fetchMock,
+      read: () => JSON.parse(Buffer.from(header!, 'base64').toString('utf8')),
+    };
+  }
+
+  function make402(route: RouteRequirements, fetchMock: typeof fetch): typeof fetch {
+    return jest.fn(async (url: unknown, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string> | undefined;
+      if (!headers || !('PAYMENT-SIGNATURE' in headers)) {
+        return make402Response(route);
+      }
+      return (fetchMock as unknown as (u: unknown, i?: RequestInit) => Promise<Response>)(url, init);
+    }) as unknown as typeof fetch;
+  }
+
+  it('permit2_exact: {x402Version, scheme, network, payload{permit{...}, transferTo, signature, payer}}', async () => {
+    const cap = captureEnvelope();
+    const agent = createTestAgent({ kind: 'evm', privateKey, rpcUrl: 'http://localhost:8545' });
+    await agent.fetchWithPayment('https://merchant.example.com/report', {
+      deps: {
+        fetch: make402(evmRoute, cap.fetchMock),
+        ensureAllowance: jest.fn(async () => undefined),
+        spenderFor: jest.fn(async () => relayerSpender),
+      } as unknown as never,
+    } as unknown as RequestInit);
+
+    const envelope = cap.read();
+    expect(Object.keys(envelope)).toEqual(['x402Version', 'scheme', 'network', 'payload']);
+    expect(envelope.x402Version).toBe(2);
+    expect(envelope.network).toBe('eip155:97'); // CAIP-2, from the challenge's testnet + bnb
+    expect(Object.keys(envelope.payload)).toEqual(['permit', 'transferTo', 'signature', 'payer']);
+    expect(Object.keys(envelope.payload.permit)).toEqual(['token', 'amount', 'nonce', 'deadline']);
+  });
+
+  it('eip3009_exact: {..., payload{auth{...}, signature, payer}}', async () => {
+    const cap = captureEnvelope();
+    const agent = createTestAgent({ kind: 'evm', privateKey, rpcUrl: 'http://localhost:8545' });
+    await agent.fetchWithPayment('https://merchant.example.com/report', {
+      deps: {
+        fetch: make402({ ...evmRoute, scheme: 'eip3009_exact' }, cap.fetchMock),
+        ensureAllowance: jest.fn(async () => undefined),
+        spenderFor: jest.fn(),
+        eip3009DomainFor: jest.fn(async () => ({ name: 'Global Dollar', version: '1' })),
+      } as unknown as never,
+    } as unknown as RequestInit);
+
+    const envelope = cap.read();
+    expect(Object.keys(envelope)).toEqual(['x402Version', 'scheme', 'network', 'payload']);
+    expect(envelope.scheme).toBe('eip3009_exact');
+    expect(Object.keys(envelope.payload)).toEqual(['auth', 'signature', 'payer']);
+    expect(Object.keys(envelope.payload.auth)).toEqual([
+      'token',
+      'from',
+      'to',
+      'value',
+      'validAfter',
+      'validBefore',
+      'nonce',
+    ]);
+  });
+
+  it('sui: {..., network "sui:<network>", payload{txBytesB64, senderSignatureB64, payer}}', async () => {
+    const suiRoute: RouteRequirements = {
+      scheme: 'sui_direct',
+      chain: 'sui',
+      network: 'testnet',
+      asset: '0x2::sui::SUI',
+      amountAtomic: 1_000_000n,
+      payTo: '0xMERCHANTSUI',
+      resource: 'https://api.example.com/report',
+      maxTimeoutSeconds: 300,
+    };
+    const cap = captureEnvelope();
+    const agent = createTestAgent({ kind: 'sui', keypairSeed: 'test-seed', rpcUrl: 'http://localhost:9000' });
+    await agent.fetchWithPayment('https://merchant.example.com/report', {
+      deps: {
+        fetch: make402(suiRoute, cap.fetchMock),
+        buildGaslessTx: jest.fn(async () => ({ txBytesB64: 'dHg=', senderSignatureB64: 'c2ln' })),
+      } as unknown as never,
+    } as unknown as RequestInit);
+
+    const envelope = cap.read();
+    expect(Object.keys(envelope)).toEqual(['x402Version', 'scheme', 'network', 'payload']);
+    expect(envelope.network).toBe('sui:testnet');
+    expect(Object.keys(envelope.payload)).toEqual(['txBytesB64', 'senderSignatureB64', 'payer']);
+  });
+
+  it('returns a 402 that carries no PAYMENT-REQUIRED header untouched, signing nothing', async () => {
+    // The agent must not invent a challenge it was never served — the shared handshake bails out
+    // before any signing dependency is touched.
+    const fetchMock = jest.fn(async () => new Response(null, { status: 402 })) as unknown as typeof fetch;
+    const spenderFor = jest.fn();
+    const agent = createTestAgent({ kind: 'evm', privateKey, rpcUrl: 'http://localhost:8545' });
+
+    const response = await agent.fetchWithPayment('https://merchant.example.com/report', {
+      deps: { fetch: fetchMock, ensureAllowance: jest.fn(), spenderFor } as unknown as never,
+    } as unknown as RequestInit);
+
+    expect(response.status).toBe(402);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(spenderFor).not.toHaveBeenCalled();
+  });
+});
+
 describe('createTestAgent — no-402 passthrough', () => {
   it('returns the response as-is when the resource is not actually payment-gated', async () => {
     const fetchMock = jest.fn(async () => new Response(JSON.stringify({ free: true }), { status: 200 })) as unknown as typeof fetch;

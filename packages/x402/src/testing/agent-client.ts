@@ -10,6 +10,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { decodeRequirementsFromHeader } from '../challenge.js';
+import { encodePaymentEnvelope, type PaymentEnvelopeParts } from '../wire.js';
 import type { RouteRequirements } from '../types.js';
 
 /** EIP-712 domain name for Permit2 — matches `apps/api/.../evm-permit2.scheme.ts#permit2Domain`. */
@@ -111,12 +112,60 @@ export interface SuiAgentDeps {
   }): Promise<{ txBytesB64: string; senderSignatureB64: string }>;
 }
 
-interface EvmFetchInit extends RequestInit {
-  deps?: EvmAgentDeps;
-}
+// ---------------------------------------------------------------------------------------------
+// The shared 402 handshake
+// ---------------------------------------------------------------------------------------------
+//
+// Tests inject stubs by passing an extra `deps` property on the `RequestInit` handed to
+// `fetchWithPayment` (`{ deps: { fetch, ... } } as unknown as RequestInit`); it is stripped off
+// before the init reaches `fetch`. `EvmAgentDeps` / `SuiAgentDeps` above describe what may go in
+// it per chain family.
 
-interface SuiFetchInit extends RequestInit {
-  deps?: SuiAgentDeps;
+/**
+ * The probe → 402 → sign → retry skeleton, shared by the EVM and Sui agents — it used to be
+ * written out once per chain family, with nothing keeping the two spellings in step. Everything
+ * chain-specific now lives in `signPayment`, which is handed the decoded challenge and the
+ * caller's injected deps (if any) and returns the scheme-specific envelope parts.
+ *
+ * Two behaviours here are load-bearing and asserted by `agent-client.spec.ts`:
+ *  - a non-402 response, or a 402 with no `PAYMENT-REQUIRED` header, is returned untouched and
+ *    NOTHING is signed (the agent must not pay for a resource that isn't gated, and must not
+ *    guess at a challenge it wasn't given);
+ *  - a throw out of `signPayment` propagates without a retry — a request is never re-sent with a
+ *    half-built or missing payment header.
+ */
+async function fetchWithPaymentHandshake<TDeps extends { fetch: typeof fetch }>(
+  url: string,
+  init: RequestInit | undefined,
+  signPayment: (args: {
+    url: string;
+    requirements: RouteRequirements & { protocol: 'x402' };
+    injectedDeps: TDeps | undefined;
+  }) => Promise<PaymentEnvelopeParts>,
+): Promise<Response> {
+  const { deps: injectedDeps, ...restInit } = (init ?? {}) as RequestInit & { deps?: TDeps };
+  const doFetch = injectedDeps?.fetch ?? fetch;
+
+  const first = await doFetch(url, restInit as RequestInit);
+  if (first.status !== 402) {
+    return first;
+  }
+
+  const challenge = first.headers.get('PAYMENT-REQUIRED');
+  if (!challenge) {
+    return first;
+  }
+  const requirements = decodeRequirementsFromHeader(challenge);
+
+  const parts = await signPayment({ url, requirements, injectedDeps });
+
+  return doFetch(url, {
+    ...restInit,
+    headers: {
+      ...(restInit.headers as Record<string, string> | undefined),
+      'PAYMENT-SIGNATURE': encodePaymentEnvelope(parts),
+    },
+  } as RequestInit);
 }
 
 /**
@@ -140,107 +189,89 @@ function createEvmAgent(opts: EvmAgentOptions): TestAgent {
 
   return {
     async fetchWithPayment(url: string, init?: RequestInit): Promise<Response> {
-      const { deps: injectedDeps, ...restInit } = (init ?? {}) as EvmFetchInit;
-      const doFetch = injectedDeps?.fetch ?? fetch;
+      return fetchWithPaymentHandshake<EvmAgentDeps>(url, init, async ({ requirements, injectedDeps }) => {
+        const deps = injectedDeps ?? (await defaultEvmDeps(opts, chain));
+        const payer = await evmAddress(opts.privateKey);
+        const chainId = CHAIN_ID_BY_CHAIN_NETWORK[chain][requirements.network];
+        const caip2 = `eip155:${chainId}`;
 
-      const first = await doFetch(url, restInit as RequestInit);
-      if (first.status !== 402) {
-        return first;
-      }
+        // The merchant's route configuration decides the scheme (it's encoded in the challenge, not
+        // negotiated by the payer) — this just follows whichever one was asked for. Use
+        // `resolveEvmRoute` on the merchant side to avoid hand-picking this in the first place.
+        if (requirements.scheme === 'eip3009_exact') {
+          const domain = await deps.eip3009DomainFor(url, requirements);
+          const nonce = '0x' + randomBytes(32).toString('hex');
+          const validAfter = 0n;
+          const validBefore = BigInt(Math.floor(Date.now() / 1000) + requirements.maxTimeoutSeconds);
 
-      const challenge = first.headers.get('PAYMENT-REQUIRED');
-      if (!challenge) {
-        return first;
-      }
-      const requirements = decodeRequirementsFromHeader(challenge);
-
-      const deps = injectedDeps ?? (await defaultEvmDeps(opts, chain));
-      const payer = await evmAddress(opts.privateKey);
-      const chainId = CHAIN_ID_BY_CHAIN_NETWORK[chain][requirements.network];
-      const caip2 = `eip155:${chainId}`;
-
-      // The merchant's route configuration decides the scheme (it's encoded in the challenge, not
-      // negotiated by the payer) — this just follows whichever one was asked for. Use
-      // `resolveEvmRoute` on the merchant side to avoid hand-picking this in the first place.
-      let payload: Record<string, unknown>;
-      let scheme: 'eip3009_exact' | 'permit2_exact';
-
-      if (requirements.scheme === 'eip3009_exact') {
-        scheme = 'eip3009_exact';
-        const domain = await deps.eip3009DomainFor(url, requirements);
-        const nonce = '0x' + randomBytes(32).toString('hex');
-        const validAfter = 0n;
-        const validBefore = BigInt(Math.floor(Date.now() / 1000) + requirements.maxTimeoutSeconds);
-
-        const signature = await signTransferAuthorization(opts.privateKey, {
-          token: requirements.asset,
-          from: payer,
-          to: requirements.payTo,
-          value: requirements.amountAtomic,
-          validAfter,
-          validBefore,
-          nonce,
-          chainId,
-          domainName: domain.name,
-          domainVersion: domain.version,
-        });
-
-        payload = {
-          auth: {
+          const signature = await signTransferAuthorization(opts.privateKey, {
             token: requirements.asset,
             from: payer,
             to: requirements.payTo,
-            value: requirements.amountAtomic.toString(),
-            validAfter: validAfter.toString(),
-            validBefore: validBefore.toString(),
+            value: requirements.amountAtomic,
+            validAfter,
+            validBefore,
             nonce,
-          },
-          signature,
-          payer,
-        };
-      } else if (requirements.scheme === 'permit2_exact') {
-        scheme = 'permit2_exact';
-        const spender = await deps.spenderFor(url, requirements);
+            chainId,
+            domainName: domain.name,
+            domainVersion: domain.version,
+          });
 
-        await deps.ensureAllowance({ token: requirements.asset, owner: payer, amount: requirements.amountAtomic });
+          return {
+            scheme: 'eip3009_exact',
+            network: caip2,
+            payload: {
+              auth: {
+                token: requirements.asset,
+                from: payer,
+                to: requirements.payTo,
+                value: requirements.amountAtomic.toString(),
+                validAfter: validAfter.toString(),
+                validBefore: validBefore.toString(),
+                nonce,
+              },
+              signature,
+              payer,
+            },
+          };
+        }
 
-        const nonce = randomUint256();
-        const deadline = BigInt(Math.floor(Date.now() / 1000) + requirements.maxTimeoutSeconds);
+        if (requirements.scheme === 'permit2_exact') {
+          const spender = await deps.spenderFor(url, requirements);
 
-        const signature = await signPermit(opts.privateKey, {
-          token: requirements.asset,
-          amount: requirements.amountAtomic,
-          spender,
-          nonce,
-          deadline,
-          chainId,
-        });
+          await deps.ensureAllowance({ token: requirements.asset, owner: payer, amount: requirements.amountAtomic });
 
-        payload = {
-          permit: {
+          const nonce = randomUint256();
+          const deadline = BigInt(Math.floor(Date.now() / 1000) + requirements.maxTimeoutSeconds);
+
+          const signature = await signPermit(opts.privateKey, {
             token: requirements.asset,
-            amount: requirements.amountAtomic.toString(),
-            nonce: nonce.toString(),
-            deadline: deadline.toString(),
-          },
-          transferTo: requirements.payTo,
-          signature,
-          payer,
-        };
-      } else {
+            amount: requirements.amountAtomic,
+            spender,
+            nonce,
+            deadline,
+            chainId,
+          });
+
+          return {
+            scheme: 'permit2_exact',
+            network: caip2,
+            payload: {
+              permit: {
+                token: requirements.asset,
+                amount: requirements.amountAtomic.toString(),
+                nonce: nonce.toString(),
+                deadline: deadline.toString(),
+              },
+              transferTo: requirements.payTo,
+              signature,
+              payer,
+            },
+          };
+        }
+
         throw new Error(`createEvmAgent can't pay an EVM route with scheme "${requirements.scheme}"`);
-      }
-
-      const envelope = { x402Version: 2, scheme, network: caip2, payload };
-      const paymentSignature = Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64');
-
-      return doFetch(url, {
-        ...restInit,
-        headers: {
-          ...(restInit.headers as Record<string, string> | undefined),
-          'PAYMENT-SIGNATURE': paymentSignature,
-        },
-      } as RequestInit);
+      });
     },
   };
 }
@@ -377,69 +408,47 @@ async function defaultEvmDeps(opts: EvmAgentOptions, chain: 'bnb' | 'robinhood')
 function createSuiAgent(opts: SuiAgentOptions): TestAgent {
   return {
     async fetchWithPayment(url: string, init?: RequestInit): Promise<Response> {
-      const { deps: injectedDeps, ...restInit } = (init ?? {}) as SuiFetchInit;
-      const doFetch = injectedDeps?.fetch ?? fetch;
+      return fetchWithPaymentHandshake<SuiAgentDeps>(url, init, async ({ requirements, injectedDeps }) => {
+        const deps = injectedDeps ?? (await defaultSuiDeps(opts));
+        const sender = await suiAddress(opts.keypairSeed);
 
-      const first = await doFetch(url, restInit as RequestInit);
-      if (first.status !== 402) {
-        return first;
-      }
+        // The merchant's route configuration decides the scheme (it's encoded in the challenge,
+        // not negotiated by the payer) — this just follows whichever one was asked for.
+        let txBytesB64: string;
+        let senderSignatureB64: string;
+        let scheme: 'sui_sponsored' | 'sui_direct';
 
-      const challenge = first.headers.get('PAYMENT-REQUIRED');
-      if (!challenge) {
-        return first;
-      }
-      const requirements = decodeRequirementsFromHeader(challenge);
-
-      const deps = injectedDeps ?? (await defaultSuiDeps(opts));
-      const sender = await suiAddress(opts.keypairSeed);
-
-      // The merchant's route configuration decides the scheme (it's encoded in the challenge,
-      // not negotiated by the payer) — this just follows whichever one was asked for.
-      let txBytesB64: string;
-      let senderSignatureB64: string;
-      let scheme: 'sui_sponsored' | 'sui_direct';
-
-      if (requirements.scheme === 'sui_direct') {
-        scheme = 'sui_direct';
-        ({ txBytesB64, senderSignatureB64 } = await deps.buildGaslessTx({
-          sender,
-          recipient: requirements.payTo,
-          coinType: requirements.asset,
-          amount: requirements.amountAtomic,
-        }));
-      } else {
-        if (!opts.sponsorAddress) {
-          throw new Error(
-            'sui_sponsored requires sponsorAddress — pass it in createTestAgent({kind:"sui", ...}), ' +
-              'or configure the route for sui_direct if the asset is SIP-58-gasless-eligible.',
-          );
+        if (requirements.scheme === 'sui_direct') {
+          scheme = 'sui_direct';
+          ({ txBytesB64, senderSignatureB64 } = await deps.buildGaslessTx({
+            sender,
+            recipient: requirements.payTo,
+            coinType: requirements.asset,
+            amount: requirements.amountAtomic,
+          }));
+        } else {
+          if (!opts.sponsorAddress) {
+            throw new Error(
+              'sui_sponsored requires sponsorAddress — pass it in createTestAgent({kind:"sui", ...}), ' +
+                'or configure the route for sui_direct if the asset is SIP-58-gasless-eligible.',
+            );
+          }
+          scheme = 'sui_sponsored';
+          ({ txBytesB64, senderSignatureB64 } = await deps.buildSponsoredTx({
+            sender,
+            gasOwner: opts.sponsorAddress,
+            recipient: requirements.payTo,
+            coinType: requirements.asset,
+            amount: requirements.amountAtomic,
+          }));
         }
-        scheme = 'sui_sponsored';
-        ({ txBytesB64, senderSignatureB64 } = await deps.buildSponsoredTx({
-          sender,
-          gasOwner: opts.sponsorAddress,
-          recipient: requirements.payTo,
-          coinType: requirements.asset,
-          amount: requirements.amountAtomic,
-        }));
-      }
 
-      const envelope = {
-        x402Version: 2,
-        scheme,
-        network: requirements.network === 'mainnet' ? 'sui:mainnet' : 'sui:testnet',
-        payload: { txBytesB64, senderSignatureB64, payer: sender },
-      };
-      const paymentSignature = Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64');
-
-      return doFetch(url, {
-        ...restInit,
-        headers: {
-          ...(restInit.headers as Record<string, string> | undefined),
-          'PAYMENT-SIGNATURE': paymentSignature,
-        },
-      } as RequestInit);
+        return {
+          scheme,
+          network: requirements.network === 'mainnet' ? 'sui:mainnet' : 'sui:testnet',
+          payload: { txBytesB64, senderSignatureB64, payer: sender },
+        };
+      });
     },
   };
 }

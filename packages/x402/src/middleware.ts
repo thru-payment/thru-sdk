@@ -3,6 +3,7 @@
 // binding lives only in the adapter files.
 
 import { buildChallengeHeaders, extractPayment } from './challenge.js';
+import { encodeRequirementsEnvelope, encodeSettleResponseEnvelope } from './wire.js';
 import type { FacilitatorClient } from './client.js';
 import type { FacilitatorRequestBody, RouteRequirements } from './types.js';
 
@@ -64,7 +65,9 @@ export async function gateRequest(
   const body: FacilitatorRequestBody = {
     protocol: extracted.protocol,
     paymentPayload: extracted.envelope,
-    paymentRequirements: encodeRequirementsForBody(route),
+    // Byte-identical to the `PAYMENT-REQUIRED` header the challenge above advertises — same
+    // encoder, see `./wire.js`.
+    paymentRequirements: encodeRequirementsEnvelope(route),
   };
 
   try {
@@ -76,7 +79,7 @@ export async function gateRequest(
       return {
         kind: 'proceed',
         responseHeaders: {
-          'PAYMENT-RESPONSE': encodeSettleResponseHeader({ success: true, network: route.network }),
+          'PAYMENT-RESPONSE': encodeSettleResponseEnvelope({ success: true, network: route.network }),
         },
       };
     }
@@ -88,7 +91,7 @@ export async function gateRequest(
     return {
       kind: 'proceed',
       responseHeaders: {
-        'PAYMENT-RESPONSE': encodeSettleResponseHeader({
+        'PAYMENT-RESPONSE': encodeSettleResponseEnvelope({
           success: true,
           txHash: result.txHash,
           network: route.network,
@@ -116,34 +119,4 @@ function rejectionToError(
     headers: buildChallengeHeaders(route, { mppSecret }),
     body: { reason: reason ?? 'payment_rejected' },
   };
-}
-
-/** Base64(JSON) encoding of `RouteRequirements`, matching `x402.codec.ts#encodeRequirements`'s
- * wire shape (bigints as decimal strings) so the facilitator can decode it regardless of which
- * protocol's envelope carried the payment. */
-function encodeRequirementsForBody(route: RouteRequirements): string {
-  const envelope = {
-    protocol: 'x402' as const,
-    scheme: route.scheme,
-    chain: route.chain,
-    network: route.network,
-    asset: route.asset,
-    amountAtomic: route.amountAtomic.toString(),
-    payTo: route.payTo,
-    resource: route.resource,
-    maxTimeoutSeconds: route.maxTimeoutSeconds,
-    extra: route.extra ?? {},
-  };
-  return Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64');
-}
-
-/** Base64(JSON) encoding for the `PAYMENT-RESPONSE` header, mirroring
- * `x402.codec.ts#encodeSettleResponse`'s wire shape. */
-function encodeSettleResponseHeader(r: {
-  success: boolean;
-  txHash?: string;
-  network: string;
-  reason?: string;
-}): string {
-  return Buffer.from(JSON.stringify(r), 'utf8').toString('base64');
 }

@@ -10,28 +10,14 @@
 // for you. Cache the result per (network, asset) if calling this on a hot path; it's meant to run
 // once at startup, same as the existing "call supported() at boot to fail fast" guidance.
 
+import { findSupportedKind } from './supported-kinds.js';
 import type { FacilitatorClient } from './client.js';
-import type { RouteRequirements, Scheme, SupportedAssetSui, SupportedKind } from './types.js';
+import type { RouteRequirements } from './types.js';
 
 export interface ResolveSuiRouteOptions {
   /** Set false to require the gasless path and reject ineligible assets instead of silently
    * falling back to a sponsor-paid settlement. Default true. */
   allowSponsored?: boolean;
-}
-
-function isSuiAsset(a: SupportedAssetSui | { address: string }): a is SupportedAssetSui {
-  return 'coinType' in a;
-}
-
-function findKind(kinds: SupportedKind[], scheme: Scheme, network: string, asset: string): SupportedKind | undefined {
-  return kinds.find(
-    (k) =>
-      k.protocol === 'x402' &&
-      k.scheme === scheme &&
-      k.chain === 'sui' &&
-      k.network === network &&
-      k.assets.some((a) => isSuiAsset(a) && a.coinType === asset),
-  );
 }
 
 /**
@@ -52,13 +38,18 @@ export async function resolveSuiRoute(
   const { kinds } = await client.supported();
   const allowSponsored = opts?.allowSponsored ?? true;
 
-  const direct = findKind(kinds, 'sui_direct', route.network, route.asset);
+  // Chain is pinned to 'sui' rather than read off `route.chain`: this is the Sui-only entry point,
+  // so a caller who passed some other chain should find nothing here rather than silently resolve
+  // a non-Sui kind. (Unchanged from the previous per-file lookup, which hardcoded it the same way.)
+  const query = { chain: 'sui' as const, network: route.network, asset: route.asset };
+
+  const direct = findSupportedKind(kinds, { ...query, scheme: 'sui_direct' });
   if (direct) {
     return { ...route, scheme: 'sui_direct', extra: { ...route.extra } };
   }
 
   if (allowSponsored) {
-    const sponsored = findKind(kinds, 'sui_sponsored', route.network, route.asset);
+    const sponsored = findSupportedKind(kinds, { ...query, scheme: 'sui_sponsored' });
     if (sponsored) {
       if (!sponsored.extra.gasOwner) {
         throw new Error(

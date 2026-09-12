@@ -11,28 +11,14 @@
 // Sui's `sui_sponsored`, which needs `gasOwner`): a payer's own signing code independently queries
 // `/supported` for whatever chain-specific data it needs (e.g. the Permit2 spender address).
 
+import { findSupportedKind } from './supported-kinds.js';
 import type { FacilitatorClient } from './client.js';
-import type { Chain, RouteRequirements, Scheme, SupportedAssetBnb, SupportedKind } from './types.js';
+import type { RouteRequirements } from './types.js';
 
 export interface ResolveEvmRouteOptions {
   /** Set false to require the gasless EIP-3009 path and reject ineligible assets instead of
    * silently falling back to Permit2 (which needs a payer approve). Default true. */
   allowPermit2?: boolean;
-}
-
-function isEvmAsset(a: SupportedAssetBnb | { coinType: string }): a is SupportedAssetBnb {
-  return 'address' in a;
-}
-
-function findKind(kinds: SupportedKind[], scheme: Scheme, chain: Chain, network: string, asset: string): SupportedKind | undefined {
-  return kinds.find(
-    (k) =>
-      k.protocol === 'x402' &&
-      k.scheme === scheme &&
-      k.chain === chain &&
-      k.network === network &&
-      k.assets.some((a) => isEvmAsset(a) && a.address.toLowerCase() === asset.toLowerCase()),
-  );
 }
 
 /**
@@ -53,13 +39,15 @@ export async function resolveEvmRoute(
   const { kinds } = await client.supported();
   const allowPermit2 = opts?.allowPermit2 ?? true;
 
-  const eip3009 = findKind(kinds, 'eip3009_exact', route.chain, route.network, route.asset);
+  const query = { chain: route.chain, network: route.network, asset: route.asset };
+
+  const eip3009 = findSupportedKind(kinds, { ...query, scheme: 'eip3009_exact' });
   if (eip3009) {
     return { ...route, scheme: 'eip3009_exact', extra: { ...route.extra } };
   }
 
   if (allowPermit2) {
-    const permit2 = findKind(kinds, 'permit2_exact', route.chain, route.network, route.asset);
+    const permit2 = findSupportedKind(kinds, { ...query, scheme: 'permit2_exact' });
     if (permit2) {
       return { ...route, scheme: 'permit2_exact', extra: { ...route.extra } };
     }
