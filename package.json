@@ -9,9 +9,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "npm run pay-sdk:build && npm run x402:build",
+    "build": "npm run checkout-core:build && npm run pay-sdk:build && npm run x402:build",
     "test": "npm run test --workspaces --if-present",
-    "verify": "npm run pay-sdk:verify && npm run x402:verify",
+    "verify": "npm run checkout-core:verify && npm run pay-sdk:verify && npm run x402:verify",
     "checkout-core:build": "npm --workspace @thru-payment/checkout-core run build",
     "checkout-core:verify": "npm --workspace @thru-payment/checkout-core run verify",
     "pay-sdk:build": "npm run checkout-core:build && npm --workspace @thru-payment/pay-sdk run build",

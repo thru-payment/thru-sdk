@@ -9,13 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: 'Package to release'
+        # Free text rather than a dropdown, deliberately. A `choice` list has to be hand-edited
+        # every time a package is added, and the failure mode is silent: the new package simply
+        # cannot be released until someone remembers to come back here. The validation step below
+        # checks the name against the real workspaces and prints the valid set on a typo, which
+        # gives the same protection without the upkeep.
+        description: 'Package directory under packages/ (e.g. x402)'
         required: true
-        type: choice
-        options:
-          - checkout-core
-          - pay-sdk
-          - x402
+        type: string
       bump:
         description: 'Version bump'
         required: true
@@ -51,11 +52,34 @@ jobs:
 
       - run: npm ci
 
-      # Same gate CI runs on every push — never publish something CI hasn't
-      # already proven builds, typechecks, and (for x402) passes its tests
-      # and smoke-tests the built artifact.
+      # Fail here, before anything is bumped, tagged or published, rather than partway through on a
+      # confusing "missing script" error. Also catches a package that exists but has no verify
+      # script, which would otherwise publish something no gate ever ran against.
+      - name: Validate package name
+        run: |
+          PKG="${{ inputs.package }}"
+          if [ ! -f "packages/$PKG/package.json" ]; then
+            echo "::error::No package at packages/$PKG. Available:"
+            ls packages | sed 's/^/  - /'
+            exit 1
+          fi
+          if ! node -e "process.exit(require('./packages/$PKG/package.json').scripts?.verify ? 0 : 1)"; then
+            echo "::error::packages/$PKG has no \"verify\" script, so there is no gate to publish behind."
+            exit 1
+          fi
+
+      # Build every workspace first, in dependency order. pay-sdk typechecks against
+      # checkout-core's emitted dist, so verifying it against an unbuilt dependency fails for a
+      # reason that has nothing to do with the release. Build order lives in the root script and
+      # nowhere else, so adding a package means editing one line rather than every workflow.
+      - name: Build all packages
+        run: npm run build
+
+      # The same gate CI runs on every push — never publish something CI has not already proven
+      # builds, typechecks, tests and smoke-tests. Resolved from the package's own name so a new
+      # package does not also need a hand-written <pkg>:verify alias at the root.
       - name: Verify package
-        run: npm run "${{ inputs.package }}:verify"
+        run: npm --workspace "$(node -p "require('./packages/${{ inputs.package }}/package.json').name")" run verify
 
       - name: Configure git identity
         run: |
