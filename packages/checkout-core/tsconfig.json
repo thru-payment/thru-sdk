@@ -22,5 +22,8 @@
     "noUnusedLocals": false,
     "types": []
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Specs are typechecked via tsconfig.spec.json (which adds node/jest types)
+  // and must never land in the published dist/.
+  "exclude": ["src/**/*.spec.ts", "dist"]
 }

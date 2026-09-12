@@ -1,56 +1,14 @@
 import type { CSSProperties } from 'react';
+import { themeToCssVars, type ThruTheme } from './core/theme.js';
 
-/**
- * Theme tokens. Every value maps to a CSS custom property, so you can theme via
- * this object, by setting the variables yourself, or with per-part `classNames`.
- */
-export type ThruTheme = Partial<{
-  colorBg: string;
-  colorSurface: string;
-  colorBorder: string;
-  colorText: string;
-  colorMuted: string;
-  colorAccent: string;
-  colorAccentText: string;
-  colorSuccess: string;
-  colorWarning: string;
-  colorDanger: string;
-  radius: string;
-  fontFamily: string;
-  fontMono: string;
-  spacing: string;
-}>;
+// The implementation moved to ./core/theme.js so it can be consumed without
+// React's types. This module is the React-typed face of it and keeps the
+// published `themeToVars` / `mergeTheme` / `ThruTheme` surface identical.
 
-const CSS_VAR: Record<keyof ThruTheme, string> = {
-  colorBg: '--thru-bg',
-  colorSurface: '--thru-surface',
-  colorBorder: '--thru-border',
-  colorText: '--thru-text',
-  colorMuted: '--thru-muted',
-  colorAccent: '--thru-accent',
-  colorAccentText: '--thru-accent-text',
-  colorSuccess: '--thru-success',
-  colorWarning: '--thru-warning',
-  colorDanger: '--thru-danger',
-  radius: '--thru-radius',
-  fontFamily: '--thru-font',
-  fontMono: '--thru-font-mono',
-  spacing: '--thru-space',
-};
+export type { ThruTheme } from './core/theme.js';
+export { mergeTheme, themeToCssVars, THRU_CSS_VARS } from './core/theme.js';
 
 /** Convert a theme object to inline CSS variable declarations. */
 export function themeToVars(theme?: ThruTheme): CSSProperties {
-  const style: Record<string, string> = {};
-  if (theme) {
-    for (const key of Object.keys(theme) as (keyof ThruTheme)[]) {
-      const value = theme[key];
-      if (value != null) style[CSS_VAR[key]] = value;
-    }
-  }
-  return style as CSSProperties;
-}
-
-export function mergeTheme(base?: ThruTheme, override?: ThruTheme): ThruTheme | undefined {
-  if (!base && !override) return undefined;
-  return { ...base, ...override };
+  return themeToCssVars(theme) as CSSProperties;
 }

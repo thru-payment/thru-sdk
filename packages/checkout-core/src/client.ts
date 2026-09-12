@@ -7,8 +7,11 @@ export type ThruClient = {
   getSubscription(id: string): Promise<PublicSubscription>;
 };
 
+/** thru's production public API base — what `<ThruProvider>` uses by default. */
+export const DEFAULT_API_BASE_URL = 'https://api.thru.la/v1';
+
 /** A read-only client for thru's public endpoints. Never sends a secret key. */
-export function createThruClient(baseUrl: string): ThruClient {
+export function createThruClient(baseUrl: string = DEFAULT_API_BASE_URL): ThruClient {
   const base = baseUrl.replace(/\/$/, '');
 
   async function get<T>(path: string): Promise<T> {
