@@ -48,48 +48,6 @@ export type CreateCheckoutSessionParams = {
   expiresInSeconds?: number;
 };
 
-export type CheckoutSession = {
-  id: string;
-  object: 'checkout.session';
-  /** Send the shopper here. */
-  url: string;
-  status: CheckoutSessionStatus;
-  source: CheckoutSessionSource;
-  productId: string | null;
-  invoiceId: string | null;
-  reference: string | null;
-  metadata: Record<string, unknown> | null;
-  chain: string | null;
-  network: string;
-  locale: string | null;
-  paymentId: string | null;
-  subscriptionId: string | null;
-  /** Money arrived after this session was already reported terminal. Grant, and also alert. */
-  late: boolean;
-  expiresAt: string;
-  redeemedAt: string | null;
-  completedAt: string | null;
-  createdAt: string;
-  livemode: boolean;
-};
-
-export type ListCheckoutSessionsParams = {
-  reference?: string;
-  /** One status, or several comma-separated. */
-  status?: string;
-  productId?: string;
-  /** ISO-8601. Walk forward from a watermark to reconcile anything a webhook dropped. */
-  createdAfter?: string;
-  limit?: number;
-  cursor?: string;
-};
-
-export type CheckoutSessionList = {
-  data: CheckoutSession[];
-  hasMore: boolean;
-  nextCursor: string | null;
-};
-
 /** The body of every `checkout.session.*` event. Identical for all four, and for all sources. */
 export type CheckoutSessionEvent = {
   sessionId: string;
@@ -125,6 +83,10 @@ export type CheckoutSessionEvent = {
   receivedAmountAtomic: string | null;
   paymentStatus: string | null;
   txHash: string | null;
+  /**
+   * When the customer's ACCESS runs out — thru's authoritative value, ISO-8601. This is what you
+   * write to your own entitlement, never a locally computed one. Null for a one-off.
+   */
   subscriptionExpiresAt: string | null;
   late: boolean;
   completedAt: string | null;
@@ -150,6 +112,46 @@ export type CheckoutSessionEvent = {
  *   minutes after the customer's transfer confirmed. Useful for treasury reconciliation, never as
  *   the signal to grant access.
  */
+
+/**
+ * A checkout session, as `retrieve` and `list` return it.
+ *
+ * This is a SUPERSET of `CheckoutSessionEvent` — the API builds both from one function, so every
+ * field you can read off a webhook you can also read off a retrieve, spelled identically. That
+ * means one mapper: `grant(session)` and `grant(event.data)` take the same object.
+ *
+ * It was not always true. Until 0.1.1 `retrieve` returned no subscription detail, so a return page
+ * following thru's own integration guide wrote a null expiry into every entitlement. If you are on
+ * 0.1.0, upgrade before granting anything from a browser return.
+ */
+export type CheckoutSession = CheckoutSessionEvent & {
+  id: string;
+  object: 'checkout.session';
+  /** Send the shopper here. */
+  url: string;
+  locale: string | null;
+  /** When the LINK stops being redeemable. Not the subscription's expiry — see below. */
+  expiresAt: string;
+  redeemedAt: string | null;
+};
+
+export type ListCheckoutSessionsParams = {
+  reference?: string;
+  /** One status, or several comma-separated. */
+  status?: string;
+  productId?: string;
+  /** ISO-8601. Walk forward from a watermark to reconcile anything a webhook dropped. */
+  createdAfter?: string;
+  limit?: number;
+  cursor?: string;
+};
+
+export type CheckoutSessionList = {
+  data: CheckoutSession[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
 export type ThruEventType =
   | 'checkout.session.completed'
   | 'checkout.session.expired'

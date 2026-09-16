@@ -131,3 +131,64 @@ describe('verifyThruReturn — input shapes', () => {
     expect((await verifyThruReturn(next, SECRET, { now: NOW })).verified).toBe(true);
   });
 });
+
+describe('the CheckoutSession type is a superset of the event', () => {
+  it('exposes subscriptionExpiresAt on a retrieved session', () => {
+    // The regression SupWallet caught: until 0.1.1 `retrieve` carried no subscription detail, so a
+    // return page following thru's own guide wrote a null expiry into every entitlement. This is a
+    // compile-time fence — if the field leaves CheckoutSession, this file stops typechecking.
+    const session: import('./types.js').CheckoutSession = {
+      id: 'cs_1',
+      object: 'checkout.session',
+      url: 'https://thru.la/c/cs_1',
+      locale: null,
+      expiresAt: '2026-09-16T12:30:00.000Z',
+      redeemedAt: null,
+      sessionId: 'cs_1',
+      merchantId: 'm1',
+      status: 'completed',
+      reference: 'sup_usr_01',
+      metadata: { plan: 'pro' },
+      referenceOrigin: 'server',
+      source: 'product',
+      kind: 'subscription',
+      productId: 'p1',
+      productSlug: 'sup-pro-monthly',
+      productName: 'SupWallet Pro',
+      invoiceId: null,
+      invoiceNumber: null,
+      paymentId: null,
+      subscriptionId: 's1',
+      planId: 'plan-1',
+      payerAddress: '0xabc',
+      chain: 'sui',
+      network: 'mainnet',
+      token: null,
+      tokenAddress: null,
+      decimals: null,
+      expectedAmount: null,
+      expectedAmountAtomic: null,
+      receivedAmount: null,
+      receivedAmountAtomic: null,
+      paymentStatus: null,
+      txHash: null,
+      subscriptionExpiresAt: '2026-10-16T12:04:11.000Z',
+      late: false,
+      completedAt: '2026-09-16T12:04:11.000Z',
+      createdAt: '2026-09-16T12:00:00.000Z',
+      livemode: true,
+    };
+
+    // The two surfaces are interchangeable for granting — that is the contract.
+    const grantFrom = (o: import('./types.js').CheckoutSessionEvent) => ({
+      key: o.sessionId,
+      until: o.subscriptionExpiresAt,
+      who: o.reference,
+    });
+    expect(grantFrom(session)).toEqual({
+      key: 'cs_1',
+      until: '2026-10-16T12:04:11.000Z',
+      who: 'sup_usr_01',
+    });
+  });
+});
