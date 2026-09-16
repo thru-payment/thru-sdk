@@ -132,6 +132,24 @@ export type CheckoutSessionEvent = {
   livemode: boolean;
 };
 
+/**
+ * Every event thru emits today.
+ *
+ * WHICH ONES TO LISTEN TO — the question that decides whether you credit a sale twice:
+ *
+ *   `checkout.session.*` is the CORRELATION layer. One shape for products, subscriptions and
+ *   invoices, carrying your own `reference`. If you send customers to thru's hosted page, listen
+ *   to these ALONE.
+ *
+ *   `payment.*` and `subscription.*` are the SPINE. They fire from inside the money path and
+ *   predate checkout sessions. They describe the SAME money as the session events — subscribing to
+ *   both is legitimate for reconciliation, but then you must dedupe on something other than "an
+ *   event arrived", because two will.
+ *
+ *   `settlement.*` is a different question entirely: when the money reached YOUR wallet, which is
+ *   minutes after the customer's transfer confirmed. Useful for treasury reconciliation, never as
+ *   the signal to grant access.
+ */
 export type ThruEventType =
   | 'checkout.session.completed'
   | 'checkout.session.expired'
@@ -141,9 +159,12 @@ export type ThruEventType =
   | 'payment.expired'
   | 'payment.underpaid'
   | 'payment.overpaid'
+  | 'payment.refunded'
   | 'subscription.activated'
   | 'subscription.extended'
-  | 'subscription.expired';
+  | 'subscription.expired'
+  | 'settlement.completed'
+  | 'settlement.failed';
 
 export type ThruEvent =
   | {
