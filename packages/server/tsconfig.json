@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // No "DOM": this package must not accidentally compile against a browser global. Everything it
+    // needs — fetch, crypto.subtle, TextEncoder — is in ES2022 + the WebWorker lib, which is the
+    // intersection of Node 20, Cloudflare Workers, Deno and Bun.
+    "lib": ["ES2022", "WebWorker"],
+    // NodeNext, NOT Bundler. This package declares "type": "module" and ships real ESM straight out
+    // of tsc, so Node's own resolver requires fully-specified relative imports (./types.js). Under
+    // Bundler, tsc accepts extensionless specifiers and emits them verbatim, producing a dist/ that
+    // only loads inside a bundler and throws ERR_MODULE_NOT_FOUND in plain Node.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true,
+    "types": []
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.spec.ts", "dist"]
+}

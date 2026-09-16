@@ -7,12 +7,40 @@ much of the UI you want built for you:
 |---|---|---|---|
 | [`@thru-payment/checkout-core`](packages/checkout-core) | a **human** — headless data layer, no UI | the browser (React) | [README](packages/checkout-core/README.md) |
 | [`@thru-payment/pay-sdk`](packages/pay-sdk) | a **human** — pre-built checkout, subscriptions | the browser (React) | [README](packages/pay-sdk/README.md) |
+| [`@thru-payment/server`](packages/server) | a **human** — hosted checkout, returns, webhooks | your server (Node / Workers / Deno / Bun) | [README](packages/server/README.md) |
 | [`@thru-payment/x402`](packages/x402) | a **machine** — AI agents paying per request | your server (Node) | [README](packages/x402/README.md) |
 
 `pay-sdk` depends on `checkout-core` and re-exports everything it has — install `checkout-core`
 alone only if you're building your own checkout UI and don't want `pay-sdk`'s `qrcode`/`clsx`
 dependencies. `x402` is unrelated to both: a merchant taking card-style crypto checkout *and*
 selling an API to agents uses `pay-sdk` (or `checkout-core`) *and* `x402`.
+
+`server` is the other half of the picture and depends on none of them. The three above run in the
+browser and read only public endpoints; `server` holds your API key and is what creates a checkout
+session, verifies a shopper's return, and verifies a webhook. If you are sending customers to
+thru's hosted page rather than embedding checkout in your own, `server` is the only package you
+need.
+
+## `@thru-payment/server`
+
+Hosted checkout from your backend: create a session carrying **your** customer reference, send the
+customer to it, verify them when they come back, and verify the webhook that covers the ones who
+don't. Web Crypto only, so it runs on Cloudflare Workers as well as Node.
+
+```bash
+npm i @thru-payment/server
+```
+```ts
+import { createThruServerClient } from '@thru-payment/server';
+
+const thru = createThruServerClient({ apiKey: process.env.THRU_API_KEY! });
+const session = await thru.checkout.sessions.create({
+  productSlug: 'pro-monthly',
+  reference: user.id,
+  successUrl: 'https://example.com/billing/success',
+});
+// -> session.url
+```
 
 ## `@thru-payment/checkout-core`
 

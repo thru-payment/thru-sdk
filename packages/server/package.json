@@ -1,0 +1,78 @@
+{
+  "name": "@thru-payment/server",
+  "version": "0.1.0",
+  "description": "Server-side SDK for thru: create hosted checkout sessions, verify the shopper's return, and verify webhooks. Web Crypto only — runs on Node, Cloudflare Workers, Deno and Bun.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./checkout": {
+      "types": "./dist/checkout.d.ts",
+      "import": "./dist/checkout.js"
+    },
+    "./webhooks": {
+      "types": "./dist/webhooks.d.ts",
+      "import": "./dist/webhooks.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "checkout": [
+        "./dist/checkout.d.ts"
+      ],
+      "webhooks": [
+        "./dist/webhooks.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "thru",
+    "payments",
+    "stablecoin",
+    "checkout",
+    "webhooks",
+    "cloudflare-workers"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
+    "smoke": "node scripts/smoke.mjs",
+    "verify": "npm run build && npm run typecheck && npm run test && npm run smoke",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thru-payment/thru-sdk.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://github.com/thru-payment/thru-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/thru-payment/thru-sdk/issues"
+  }
+}
