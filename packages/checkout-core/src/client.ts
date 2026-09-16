@@ -1,10 +1,8 @@
-import type { PublicPayment, PublicPlan, PublicSubscription } from './types.js';
+import type { PublicPayment } from './types.js';
 
 export type ThruClient = {
   baseUrl: string;
   getPayment(id: string): Promise<PublicPayment>;
-  getPlan(id: string): Promise<PublicPlan>;
-  getSubscription(id: string): Promise<PublicSubscription>;
 };
 
 /** thru's production public API base — what `<ThruProvider>` uses by default. */
@@ -27,7 +25,5 @@ export function createThruClient(baseUrl: string = DEFAULT_API_BASE_URL): ThruCl
   return {
     baseUrl: base,
     getPayment: (id) => get<PublicPayment>(`/public/payments/${id}`),
-    getPlan: (id) => get<PublicPlan>(`/public/direct-pay/plans/${id}`),
-    getSubscription: (id) => get<PublicSubscription>(`/public/direct-pay/subscriptions/${id}`),
   };
 }

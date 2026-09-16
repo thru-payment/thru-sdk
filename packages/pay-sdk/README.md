@@ -43,11 +43,6 @@ function App() {
 }
 ```
 
-```tsx
-// Direct Pay subscription
-<DirectPaySubscribe planId={planId} subscriptionId={subscriptionId} />
-```
-
 ## Theming - four layers, pick any
 
 **1. Theme tokens** (quickest):
@@ -112,10 +107,10 @@ overrides, and `labels` to customize copy.
 
 ## Exports
 
-- Widgets: `ThruCheckout`, `DirectPaySubscribe`
+- Widgets: `ThruCheckout`
 - Primitives: `ThruRoot`, `PaymentAmount`, `PaymentAddress`, `PaymentQRCode`, `PaymentStatusBadge`
 - Utils only `pay-sdk` has: `cn`, `toQrDataUrl` (the `qrcode`/`clsx`-backed ones)
-- Everything else - `usePayment`, `usePlan`, `useSubscription`, `createThruClient`, `themeToVars`,
+- Everything else - `usePayment`, `createThruClient`, `themeToVars`,
   `mergeTheme`, `shorten`, `statusTone`, `statusLabel`, `formatDuration`, `ThruProvider`, `useThru`
   - is re-exported from [`@thru-payment/checkout-core`](../checkout-core), which you can also
   import directly if you don't want the components above.

@@ -16,7 +16,7 @@ import type { CheckoutSessionEvent, ThruEvent } from './types.js';
  *    whitespace and the signature will not match.
  *
  * 2. **Answer 4xx/5xx when you could not handle it.** A 200 means "recorded" and thru stops
- *    retrying. Returning 200 for an event you could not map — an unknown plan, a database that was
+ *    retrying. Returning 200 for an event you could not map — an unknown product, a database that was
  *    down — is how a paying customer silently never gets what they bought. Return 422 and let the
  *    retry schedule do its job.
  */
@@ -81,7 +81,7 @@ export async function constructThruEvent(
  * Narrow an event to the checkout-session family.
  *
  * All four `checkout.session.*` events carry an identical payload, and so does a one-off product,
- * a subscription product and an invoice — the irrelevant fields are null. One handler covers every
+ * a product and an invoice — the irrelevant fields are null. One handler covers every
  * case, which is the whole reason to listen to these rather than to `payment.*`.
  */
 export function isCheckoutSessionEvent(

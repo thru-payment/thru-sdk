@@ -28,12 +28,9 @@ export {
 
 export {
   createPaymentStore,
-  createPlanStore,
-  createSubscriptionStore,
   isTerminalPaymentStatus,
   TERMINAL_PAYMENT_STATUSES,
   DEFAULT_PAYMENT_POLL_MS,
-  DEFAULT_SUBSCRIPTION_POLL_MS,
 } from './resources.js';
 
 export {
@@ -51,9 +48,4 @@ export {
   type StatusTone,
 } from '../format.js';
 
-export type {
-  PublicPayment,
-  PublicPlan,
-  PublicSubscription,
-  PublicPaymentTransaction,
-} from '../types.js';
+export type { PublicPayment, PublicPaymentTransaction } from '../types.js';

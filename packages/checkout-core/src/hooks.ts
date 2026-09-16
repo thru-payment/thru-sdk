@@ -9,13 +9,9 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { useOptionalThru } from './provider.js';
 import type { ThruClient } from './client.js';
-import type { PublicPayment, PublicPlan, PublicSubscription } from './types.js';
+import type { PublicPayment } from './types.js';
 import { createIdleStore, type AsyncState, type ThruStore } from './core/store.js';
-import {
-  createPaymentStore,
-  createPlanStore,
-  createSubscriptionStore,
-} from './core/resources.js';
+import { createPaymentStore } from './core/resources.js';
 
 export type { AsyncState } from './core/store.js';
 
@@ -49,7 +45,7 @@ function useResolvedClient(explicit?: ThruClient): ThruClient {
  * `@thru-payment/checkout-core/core` with custom options.
  *
  *   const store = useMemo(
- *     () => createSubscriptionStore(client, id, { isTerminal: (s) => s.active }),
+ *     () => createPaymentStore(client, id, { intervalMs: 2000 }),
  *     [client, id],
  *   );
  *   const { data } = useThruStore(store);
@@ -64,41 +60,6 @@ export function usePayment(id?: string, options?: PollHookOptions): AsyncState<P
   const intervalMs = options?.intervalMs;
   const store = useMemo(
     () => (id ? createPaymentStore(client, id, { intervalMs }) : createIdleStore<PublicPayment>()),
-    [client, id, intervalMs],
-  );
-  return useThruStore(store);
-}
-
-/** Fetch a plan's public details once. */
-export function usePlan(id?: string, options?: ThruHookOptions): AsyncState<PublicPlan> {
-  const client = useResolvedClient(options?.client);
-  const store = useMemo(
-    () => (id ? createPlanStore(client, id) : createIdleStore<PublicPlan>()),
-    [client, id],
-  );
-  return useThruStore(store);
-}
-
-/**
- * Poll a subscription's public status (active / expiresAt change over time).
- *
- * Keeps polling for as long as the component is mounted, by design: a thru
- * subscription has no terminal status — an `expired` one is revived by the next
- * on-chain payment. To end the poll on a condition of your own, build a store
- * with `createSubscriptionStore(client, id, { isTerminal })` from
- * `@thru-payment/checkout-core/core` and feed it to `useThruStore`.
- */
-export function useSubscription(
-  id?: string,
-  options?: PollHookOptions,
-): AsyncState<PublicSubscription> {
-  const client = useResolvedClient(options?.client);
-  const intervalMs = options?.intervalMs;
-  const store = useMemo(
-    () =>
-      id
-        ? createSubscriptionStore(client, id, { intervalMs })
-        : createIdleStore<PublicSubscription>(),
     [client, id, intervalMs],
   );
   return useThruStore(store);

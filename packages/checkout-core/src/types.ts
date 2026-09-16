@@ -20,22 +20,3 @@ export type PublicPayment = {
   confirmedAt?: string | null;
   transactions?: PublicPaymentTransaction[];
 };
-
-export type PublicPlan = {
-  id: string;
-  name: string;
-  chain: string;
-  network: string;
-  token: string;
-  receivingAddress: string;
-  price: string;
-  periodSeconds: number;
-};
-
-export type PublicSubscription = {
-  id: string;
-  planId: string;
-  status: string;
-  expiresAt?: string | null;
-  active: boolean;
-};

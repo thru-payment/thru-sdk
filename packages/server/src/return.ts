@@ -18,7 +18,7 @@ import type { ReturnOutcome } from './types.js';
  *
  * So the rule is: **render on the signature, grant on the retrieve.** This function's return type
  * enforces it — it carries a session id and a status and nothing else. There is no amount, no
- * reference and no plan on it, so there is nothing to grant from without calling
+ * reference and no amount on it, so there is nothing to grant from without calling
  * `thru.checkout.sessions.retrieve(...)` first.
  */
 

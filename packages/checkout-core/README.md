@@ -95,37 +95,33 @@ wrapper too.
 Root (`@thru-payment/checkout-core`) - React:
 
 - Provider: `ThruProvider`, `useThru`, `useOptionalThru`
-- Hooks: `usePayment`, `usePlan`, `useSubscription`, `useThruStore`, `AsyncState`
+- Hooks: `usePayment`, `useThruStore`, `AsyncState`
 - Theming: `themeToVars` (React `CSSProperties`)
 - ...plus everything in `./core` below, re-exported.
 
 `./core` (`@thru-payment/checkout-core/core`) - no React:
 
 - Client: `createThruClient`, `DEFAULT_API_BASE_URL`, `ThruClient`
-- Stores: `createPaymentStore`, `createPlanStore`, `createSubscriptionStore`, `createResourceStore`,
-  `createIdleStore`, `ThruStore`, `AsyncState`, `ResourceStoreOptions`, `Unsubscribe`
-- Status: `isTerminalPaymentStatus`, `TERMINAL_PAYMENT_STATUSES`, `DEFAULT_PAYMENT_POLL_MS`,
-  `DEFAULT_SUBSCRIPTION_POLL_MS`
+- Stores: `createPaymentStore`, `createResourceStore`, `createIdleStore`, `ThruStore`,
+  `AsyncState`, `ResourceStoreOptions`, `Unsubscribe`
+- Status: `isTerminalPaymentStatus`, `TERMINAL_PAYMENT_STATUSES`, `DEFAULT_PAYMENT_POLL_MS`
 - Theming: `themeToCssVars`, `mergeTheme`, `THRU_CSS_VARS`, `ThruTheme`
 - Utilities: `shorten`, `statusTone`, `statusLabel`, `formatDuration`, `StatusTone`
-- Types: `PublicPayment`, `PublicPlan`, `PublicSubscription`, `PublicPaymentTransaction`
+- Types: `PublicPayment`, `PublicPaymentTransaction`
 
 ### Polling behaviour
 
 | Resource | Interval | Stops when |
 | --- | --- | --- |
 | Payment | 5s | status is `confirmed`, `settled`, `expired`, `underpaid`, `overpaid`, `failed`, `refunded` |
-| Plan | - | after one fetch; plans are static |
-| Subscription | 8s | never on its own - see below |
 
-A thru subscription has **no terminal status**: its lifecycle is `pending` -> `active` -> `expired`
--> `active` again, because an expired subscription is revived by the next on-chain payment. A
-subscribe widget therefore has to keep watching. If your surface only cares about one transition,
-end the poll yourself:
+`expired` is terminal for the POLL, not for the money: thru still credits a late transfer to an
+expired payment's address. If your surface has to see that, keep a store alive with your own
+`isTerminal`:
 
 ```ts
-createSubscriptionStore(client, id, { isTerminal: (s) => s.active });
-createSubscriptionStore(client, id, { retryOnError: false }); // stop hammering an id that 404s
+createPaymentStore(client, id, { isTerminal: (p) => p.status === 'confirmed' });
+createPaymentStore(client, id, { retryOnError: false }); // stop hammering an id that 404s
 ```
 
 ## License

@@ -59,16 +59,12 @@ export type CheckoutSessionEvent = {
   /** 'server' when thru minted the session for you; 'none' when no reference was set. */
   referenceOrigin: 'server' | 'none';
   source: CheckoutSessionSource;
-  kind: 'one_off' | 'subscription';
   productId: string | null;
   productSlug: string | null;
   productName: string | null;
   invoiceId: string | null;
   invoiceNumber: string | null;
   paymentId: string | null;
-  subscriptionId: string | null;
-  planId: string | null;
-  payerAddress: string | null;
   chain: string | null;
   /** Load-bearing: gate on this if your entitlement is mainnet-only. */
   network: string;
@@ -86,13 +82,6 @@ export type CheckoutSessionEvent = {
   receivedAmountAtomic: string | null;
   paymentStatus: string | null;
   txHash: string | null;
-  /**
-   * When the customer's ACCESS runs out — thru's authoritative value, ISO-8601. This is what you
-   * write to your own entitlement, never a locally computed one. Null for a one-off.
-   */
-  subscriptionExpiresAt: string | null;
-  /** The billing period in seconds (2592000 for a 30-day plan). Null for a one-off. */
-  periodSeconds: number | null;
   late: boolean;
   completedAt: string | null;
   createdAt: string;
@@ -104,14 +93,13 @@ export type CheckoutSessionEvent = {
  *
  * WHICH ONES TO LISTEN TO — the question that decides whether you credit a sale twice:
  *
- *   `checkout.session.*` is the CORRELATION layer. One shape for products, subscriptions and
- *   invoices, carrying your own `reference`. If you send customers to thru's hosted page, listen
- *   to these ALONE.
+ *   `checkout.session.*` is the CORRELATION layer. One shape for products and invoices, carrying
+ *   your own `reference`. If you send customers to thru's hosted page, listen to these ALONE.
  *
- *   `payment.*` and `subscription.*` are the SPINE. They fire from inside the money path and
- *   predate checkout sessions. They describe the SAME money as the session events — subscribing to
- *   both is legitimate for reconciliation, but then you must dedupe on something other than "an
- *   event arrived", because two will.
+ *   `payment.*` is the SPINE. These fire from inside the money path and predate checkout
+ *   sessions. They describe the SAME money as the session events — subscribing to both is
+ *   legitimate for reconciliation, but then you must dedupe on something other than "an event
+ *   arrived", because two will.
  *
  *   `settlement.*` is a different question entirely: when the money reached YOUR wallet, which is
  *   minutes after the customer's transfer confirmed. Useful for treasury reconciliation, never as
@@ -125,9 +113,8 @@ export type CheckoutSessionEvent = {
  * field you can read off a webhook you can also read off a retrieve, spelled identically. That
  * means one mapper: `grant(session)` and `grant(event.data)` take the same object.
  *
- * It was not always true. Until 0.1.1 `retrieve` returned no subscription detail, so a return page
- * following thru's own integration guide wrote a null expiry into every entitlement. If you are on
- * 0.1.0, upgrade before granting anything from a browser return.
+ * It was not always true. Until 0.1.1 `retrieve` returned a shape of its own, so a return page
+ * following thru's own integration guide read fields that were never there.
  */
 export type CheckoutSession = CheckoutSessionEvent & {
   id: string;
@@ -135,7 +122,12 @@ export type CheckoutSession = CheckoutSessionEvent & {
   /** Send the shopper here. */
   url: string;
   locale: string | null;
-  /** When the LINK stops being redeemable. Not the subscription's expiry — see below. */
+  /**
+   * When the LINK stops being redeemable.
+   *
+   * It is not a deadline on the money: once a shopper has redeemed the session and been quoted an
+   * address, a transfer to that address is still credited after this passes.
+   */
   expiresAt: string;
   redeemedAt: string | null;
 };
@@ -167,13 +159,6 @@ export type ThruEventType =
   | 'payment.underpaid'
   | 'payment.overpaid'
   | 'payment.refunded'
-  | 'subscription.activated'
-  | 'subscription.extended'
-  | 'subscription.expired'
-  /** A move between plans was asked for. Nothing has changed hands yet. */
-  | 'subscription.plan_change_scheduled'
-  /** The move took effect: an upgrade was paid for, or a downgrade's date arrived. */
-  | 'subscription.plan_changed'
   | 'settlement.completed'
   | 'settlement.failed';
 

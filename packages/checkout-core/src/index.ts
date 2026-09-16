@@ -12,8 +12,6 @@ export { createThruClient, DEFAULT_API_BASE_URL, type ThruClient } from './clien
 
 export {
   usePayment,
-  usePlan,
-  useSubscription,
   useThruStore,
   type AsyncState,
   type ThruHookOptions,
@@ -30,21 +28,13 @@ export {
   createResourceStore,
   createIdleStore,
   createPaymentStore,
-  createPlanStore,
-  createSubscriptionStore,
   isTerminalPaymentStatus,
   TERMINAL_PAYMENT_STATUSES,
   DEFAULT_PAYMENT_POLL_MS,
-  DEFAULT_SUBSCRIPTION_POLL_MS,
   type ThruStore,
   type StoreListener,
   type Unsubscribe,
   type ResourceStoreOptions,
 } from './core/index.js';
 
-export type {
-  PublicPayment,
-  PublicPlan,
-  PublicSubscription,
-  PublicPaymentTransaction,
-} from './types.js';
+export type { PublicPayment, PublicPaymentTransaction } from './types.js';

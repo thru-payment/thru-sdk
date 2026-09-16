@@ -44,8 +44,7 @@ const session = await thru.checkout.sessions.create({
 
 ## `@thru-payment/checkout-core`
 
-The provider, typed client, and hooks (`usePayment`, `usePlan`, `useSubscription`) that poll thru's
-public endpoints. No components, no styling deps — bring your own UI.
+The provider, typed client, and the `usePayment` hook that polls thru's public endpoints. No components, no styling deps — bring your own UI.
 
 ```tsx
 import { ThruProvider, usePayment } from '@thru-payment/checkout-core';

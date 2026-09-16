@@ -2,12 +2,10 @@ import { jest } from '@jest/globals';
 import { createResourceStore, createIdleStore, type AsyncState } from './store.js';
 import {
   createPaymentStore,
-  createPlanStore,
-  createSubscriptionStore,
   isTerminalPaymentStatus,
 } from './resources.js';
 import type { ThruClient } from '../client.js';
-import type { PublicPayment, PublicPlan, PublicSubscription } from '../types.js';
+import type { PublicPayment } from '../types.js';
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -33,28 +31,11 @@ function payment(status: string): PublicPayment {
   };
 }
 
-function subscription(status: string, active: boolean): PublicSubscription {
-  return { id: 'sub_1', planId: 'plan_1', status, active };
-}
-
-const plan: PublicPlan = {
-  id: 'plan_1',
-  name: 'Pro',
-  chain: 'sui',
-  network: 'mainnet',
-  token: 'USDC',
-  receivingAddress: '0xabc',
-  price: '10',
-  periodSeconds: 2592000,
-};
-
 /** A client whose reads are scripted, so the poll loop is fully observable. */
 function scriptedClient(script: {
   payments?: Array<PublicPayment | Error>;
-  plans?: Array<PublicPlan | Error>;
-  subscriptions?: Array<PublicSubscription | Error>;
 }) {
-  const calls = { getPayment: 0, getPlan: 0, getSubscription: 0 };
+  const calls = { getPayment: 0 };
   function next<T>(list: Array<T | Error> | undefined, index: number): Promise<T> {
     const value = list?.[Math.min(index, (list?.length ?? 1) - 1)];
     if (value instanceof Error) return Promise.reject(value);
@@ -63,8 +44,6 @@ function scriptedClient(script: {
   const client: ThruClient = {
     baseUrl: 'https://example.test/v1',
     getPayment: () => next<PublicPayment>(script.payments, calls.getPayment++),
-    getPlan: () => next<PublicPlan>(script.plans, calls.getPlan++),
-    getSubscription: () => next<PublicSubscription>(script.subscriptions, calls.getSubscription++),
   };
   return { client, calls };
 }
@@ -226,101 +205,11 @@ describe('createPaymentStore', () => {
   });
 });
 
-describe('createPlanStore', () => {
-  it('fetches once and never polls', async () => {
-    const { client, calls } = scriptedClient({ plans: [plan] });
-    const store = createPlanStore(client, 'plan_1');
-    const { unsubscribe } = collect<PublicPlan>(store);
-
-    await jest.advanceTimersByTimeAsync(0);
-    expect(calls.getPlan).toBe(1);
-    await jest.advanceTimersByTimeAsync(60_000);
-    expect(calls.getPlan).toBe(1);
-    expect(store.getSnapshot().data).toEqual(plan);
-    unsubscribe();
-  });
-
-  it('clears data and does not retry on failure', async () => {
-    const { client, calls } = scriptedClient({ plans: [new Error('nope')] });
-    const store = createPlanStore(client, 'plan_1');
-    const { unsubscribe } = collect<PublicPlan>(store);
-
-    await jest.advanceTimersByTimeAsync(0);
-    expect(store.getSnapshot()).toEqual({
-      data: null,
-      error: expect.any(Error),
-      loading: false,
-    });
-    await jest.advanceTimersByTimeAsync(60_000);
-    expect(calls.getPlan).toBe(1);
-    unsubscribe();
-  });
-
-  it('refetches on refresh()', async () => {
-    const { client, calls } = scriptedClient({ plans: [plan] });
-    const store = createPlanStore(client, 'plan_1');
-    const { unsubscribe } = collect<PublicPlan>(store);
-    await jest.advanceTimersByTimeAsync(0);
-    await store.refresh();
-    expect(calls.getPlan).toBe(2);
-    unsubscribe();
-  });
-});
-
-describe('createSubscriptionStore', () => {
-  it('polls every 8s and does not stop on its own', async () => {
-    // Deliberate: a thru subscription has no terminal status. `expired` is
-    // revived by the next on-chain payment, so the widget must keep watching.
-    const { client, calls } = scriptedClient({
-      subscriptions: [subscription('pending', false), subscription('active', true)],
-    });
-    const store = createSubscriptionStore(client, 'sub_1');
-    const { unsubscribe } = collect<PublicSubscription>(store);
-
-    await jest.advanceTimersByTimeAsync(0);
-    expect(calls.getSubscription).toBe(1);
-    await jest.advanceTimersByTimeAsync(8000 * 4);
-    expect(calls.getSubscription).toBe(5);
-
-    // ...but it does stop the moment nobody is listening.
-    unsubscribe();
-    await jest.advanceTimersByTimeAsync(8000 * 4);
-    expect(calls.getSubscription).toBe(5);
-  });
-
-  it('accepts an isTerminal opt-out that ends the poll', async () => {
-    const { client, calls } = scriptedClient({
-      subscriptions: [subscription('pending', false), subscription('active', true)],
-    });
-    const store = createSubscriptionStore(client, 'sub_1', {
-      isTerminal: (s) => s.active,
-    });
-    const { unsubscribe } = collect<PublicSubscription>(store);
-
-    await jest.advanceTimersByTimeAsync(0);
-    await jest.advanceTimersByTimeAsync(8000);
-    expect(calls.getSubscription).toBe(2);
-    await jest.advanceTimersByTimeAsync(8000 * 10);
-    expect(calls.getSubscription).toBe(2);
-    unsubscribe();
-  });
-
-  it('stops retrying a permanently failing id when asked', async () => {
-    const { client, calls } = scriptedClient({ subscriptions: [new Error('404')] });
-    const store = createSubscriptionStore(client, 'sub_1', { retryOnError: false });
-    const { unsubscribe } = collect<PublicSubscription>(store);
-    await jest.advanceTimersByTimeAsync(0);
-    await jest.advanceTimersByTimeAsync(8000 * 10);
-    expect(calls.getSubscription).toBe(1);
-    unsubscribe();
-  });
-});
-
 describe('createIdleStore', () => {
   it('is permanently empty and safe to subscribe to', () => {
     const store = createIdleStore<PublicPayment>();
     expect(store.getSnapshot()).toEqual({ data: null, error: null, loading: false });
-    expect(store.getSnapshot()).toBe(createIdleStore<PublicPlan>().getSnapshot());
+    expect(store.getSnapshot()).toBe(createIdleStore<PublicPayment>().getSnapshot());
     expect(() => store.subscribe(() => {})()).not.toThrow();
   });
 });

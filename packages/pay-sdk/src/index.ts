@@ -8,8 +8,6 @@ export {
   createThruClient,
   type ThruClient,
   usePayment,
-  usePlan,
-  useSubscription,
   type AsyncState,
   themeToVars,
   mergeTheme,
@@ -20,8 +18,6 @@ export {
   formatDuration,
   type StatusTone,
   type PublicPayment,
-  type PublicPlan,
-  type PublicSubscription,
   type PublicPaymentTransaction,
 } from '@thru-payment/checkout-core';
 
@@ -42,8 +38,3 @@ export {
   type ThruCheckoutClassNames,
   type ThruCheckoutLabels,
 } from './components/ThruCheckout';
-export {
-  DirectPaySubscribe,
-  type DirectPaySubscribeClassNames,
-  type DirectPaySubscribeLabels,
-} from './components/DirectPaySubscribe';
