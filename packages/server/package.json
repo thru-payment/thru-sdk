@@ -1,6 +1,6 @@
 {
   "name": "@thru-payment/server",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Server-side SDK for thru: create hosted checkout sessions, verify the shopper's return, and verify webhooks. Web Crypto only — runs on Node, Cloudflare Workers, Deno and Bun.",
   "type": "module",
   "license": "MIT",
