@@ -135,13 +135,13 @@ Two rules that decide whether a paying customer gets what they bought:
 - **Read the raw body.** The signature covers the exact bytes thru sent. Re-serialising a parsed
   object changes key order and whitespace, and the signature will not match.
 - **Answer 4xx/5xx when you could not handle it.** A `200` means "recorded" and thru stops
-  retrying. Returning `200` for an event you could not map — unknown plan, database down — is
+  retrying. Returning `200` for an event you could not map — unknown product, database down — is
   exactly how a paid customer silently never gets their entitlement. Return `422` and let the retry
   schedule work.
 
 `checkout.session.completed`, `.expired`, `.cancelled` and `.failed` all carry an **identical
-payload**, and so do a one-off product, a subscription product and an invoice — irrelevant fields
-are `null`. One handler covers every case.
+payload**, and so do a product and an invoice — irrelevant fields are `null`. One handler covers
+every case.
 
 Fields worth knowing about:
 

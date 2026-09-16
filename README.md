@@ -6,7 +6,7 @@ much of the UI you want built for you:
 | Package | You are charging… | Runs in | Docs |
 |---|---|---|---|
 | [`@thru-payment/checkout-core`](packages/checkout-core) | a **human** — headless data layer, no UI | the browser (React) | [README](packages/checkout-core/README.md) |
-| [`@thru-payment/pay-sdk`](packages/pay-sdk) | a **human** — pre-built checkout, subscriptions | the browser (React) | [README](packages/pay-sdk/README.md) |
+| [`@thru-payment/pay-sdk`](packages/pay-sdk) | a **human** — pre-built checkout components | the browser (React) | [README](packages/pay-sdk/README.md) |
 | [`@thru-payment/server`](packages/server) | a **human** — hosted checkout, returns, webhooks | your server (Node / Workers / Deno / Bun) | [README](packages/server/README.md) |
 | [`@thru-payment/x402`](packages/x402) | a **machine** — AI agents paying per request | your server (Node) | [README](packages/x402/README.md) |
 
@@ -52,7 +52,7 @@ import { ThruProvider, usePayment } from '@thru-payment/checkout-core';
 
 ## `@thru-payment/pay-sdk`
 
-Embeddable, themeable checkout and Direct Pay subscribe components, built on `checkout-core`. Safe
+Embeddable, themeable checkout components, built on `checkout-core`. Safe
 in the browser — it only reads public, secret-free endpoints, so your secret API key never leaves
 your server.
 

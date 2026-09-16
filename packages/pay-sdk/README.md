@@ -1,9 +1,9 @@
 # @thru-payment/pay-sdk
 
-Embeddable, **fully themeable** crypto checkout and subscription components for
-[thru](https://thru.la). Drop a payment or Direct Pay subscribe widget into your
-own pages and restyle it to match your brand - from a one-line theme override all
-the way down to a headless render with your own markup.
+Embeddable, **fully themeable** crypto checkout components for
+[thru](https://thru.la). Drop a payment widget into your own pages and restyle it
+to match your brand - from a one-line theme override all the way down to a
+headless render with your own markup.
 
 It is **safe to run in the browser**: the SDK only reads public, secret-free
 endpoints. Your secret API key never leaves your server.
@@ -27,8 +27,10 @@ import '@thru-payment/pay-sdk/styles.css'; // optional default theme
 
 ## How it works
 
-1. Your **backend** creates a payment (`POST /v1/payments`) or a Direct Pay plan
-   and subscription with your secret key.
+1. Your **backend** creates a payment (`POST /v1/payments`) with your secret key —
+   or, better, a checkout session with
+   [`@thru-payment/server`](../server), which carries your own customer reference
+   through to the webhook.
 2. You pass the returned **id** to a component.
 3. The component renders the checkout and **polls public status** until it
    confirms - no secret key in the browser.

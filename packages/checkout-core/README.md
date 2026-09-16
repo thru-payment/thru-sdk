@@ -1,7 +1,7 @@
 # @thru-payment/checkout-core
 
 The headless data layer behind [`@thru-payment/pay-sdk`](../pay-sdk): a provider, a typed
-read-only client, and hooks that poll thru's public checkout/subscription endpoints. No components,
+read-only client, and a hook that polls thru's public payment endpoints. No components,
 no CSS, no `qrcode`/`clsx` dependency - if you're building your own checkout UI from scratch and
 just want thru's data and state, install this instead of `pay-sdk`.
 

@@ -1,7 +1,7 @@
 {
   "name": "@thru-payment/pay-sdk",
   "version": "0.1.1",
-  "description": "Embeddable, fully themeable crypto checkout and subscription components for thru.",
+  "description": "Embeddable, fully themeable crypto checkout components for thru.",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.js",
