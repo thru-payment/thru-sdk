@@ -77,7 +77,10 @@ export type CheckoutSessionEvent = {
   tokenAddress: string | null;
   decimals: number | null;
   expectedAmount: string | null;
-  /** The same amount in atomic units, computed by thru. Exact; no float involved. */
+  /**
+   * The same amount in atomic units, computed by thru. Exact; no float involved — compare against
+   * your own expectation to catch a price that changed on one side and not the other.
+   */
   expectedAmountAtomic: string | null;
   receivedAmount: string | null;
   receivedAmountAtomic: string | null;
@@ -88,6 +91,8 @@ export type CheckoutSessionEvent = {
    * write to your own entitlement, never a locally computed one. Null for a one-off.
    */
   subscriptionExpiresAt: string | null;
+  /** The billing period in seconds (2592000 for a 30-day plan). Null for a one-off. */
+  periodSeconds: number | null;
   late: boolean;
   completedAt: string | null;
   createdAt: string;

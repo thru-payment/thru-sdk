@@ -173,6 +173,7 @@ describe('the CheckoutSession type is a superset of the event', () => {
       paymentStatus: null,
       txHash: null,
       subscriptionExpiresAt: '2026-10-16T12:04:11.000Z',
+      periodSeconds: 2592000,
       late: false,
       completedAt: '2026-09-16T12:04:11.000Z',
       createdAt: '2026-09-16T12:00:00.000Z',
