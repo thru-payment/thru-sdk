@@ -80,8 +80,8 @@ export async function constructThruEvent(
 /**
  * Narrow an event to the checkout-session family.
  *
- * All four `checkout.session.*` events carry an identical payload, and so does a one-off product,
- * a product and an invoice — the irrelevant fields are null. One handler covers every
+ * All four `checkout.session.*` events carry an identical payload, and so do a product and an
+ * invoice — the irrelevant fields are null. One handler covers every
  * case, which is the whole reason to listen to these rather than to `payment.*`.
  */
 export function isCheckoutSessionEvent(
