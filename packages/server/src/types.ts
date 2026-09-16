@@ -170,6 +170,10 @@ export type ThruEventType =
   | 'subscription.activated'
   | 'subscription.extended'
   | 'subscription.expired'
+  /** A move between plans was asked for. Nothing has changed hands yet. */
+  | 'subscription.plan_change_scheduled'
+  /** The move took effect: an upgrade was paid for, or a downgrade's date arrived. */
+  | 'subscription.plan_changed'
   | 'settlement.completed'
   | 'settlement.failed';
 
