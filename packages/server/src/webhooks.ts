@@ -1,5 +1,5 @@
 import { hmacHex, safeEqualHex } from './hmac.js';
-import type { CheckoutSessionEvent, ThruEvent } from './types.js';
+import type { CheckoutSessionEvent, PaymentEventType, ThruEvent } from './types.js';
 
 /**
  * Verifying a thru webhook.
@@ -88,6 +88,23 @@ export function isCheckoutSessionEvent(
   event: ThruEvent,
 ): event is ThruEvent & { type: `checkout.session.${string}`; data: CheckoutSessionEvent } {
   return typeof event.type === 'string' && event.type.startsWith('checkout.session.');
+}
+
+/**
+ * Narrow an event to the payment family: `payment.confirmed`, `.underpaid`, `.overpaid`,
+ * `.refunded` and `.expired`.
+ *
+ * This is the family to listen to when the AMOUNT is the question — a custom-amount top-up
+ * credited from what arrived rather than a plan granted because it was paid for. Inside the
+ * guard, `event.type` discriminates: the four money events carry `data.payment` and
+ * `data.blockchainTransaction`; `payment.expired` is flat and carries only the lapsed quote.
+ * All five carry `data.checkoutSession` when the payment belongs to a session, and it is ABSENT
+ * (not null) when it does not — so check for it before reading `reference`.
+ */
+export function isPaymentEvent(
+  event: ThruEvent,
+): event is Extract<ThruEvent, { type: PaymentEventType }> {
+  return typeof event.type === 'string' && event.type.startsWith('payment.');
 }
 
 function readHeader(source: HeaderSource, name: string): string | null {

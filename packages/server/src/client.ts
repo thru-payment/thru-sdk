@@ -1,8 +1,10 @@
 import type {
+  AmountBounds,
   CheckoutSession,
   CheckoutSessionList,
   CreateCheckoutSessionParams,
   ListCheckoutSessionsParams,
+  Payment,
 } from './types.js';
 import { DEFAULT_API_BASE_URL } from './types.js';
 
@@ -16,6 +18,38 @@ export class ThruApiError extends Error {
     this.status = status;
     this.payload = payload;
   }
+}
+
+/**
+ * The bounds thru reported when it refused an `amount`, or null if this is any other failure.
+ *
+ * A create with an amount outside the product's range is a 400 whose body carries `minAmount`,
+ * `maxAmount` and `currency` alongside the message. The point of surfacing them typed is the
+ * requirement behind the feature: a shopper learns the real minimum from your form, before they
+ * type, not from a stuck payment after they transfer. Show `minAmount`; it is already the
+ * effective one (the product's floor, never below thru's 0.01).
+ *
+ * ```ts
+ * try {
+ *   session = await thru.checkout.sessions.create({ productSlug: 'credits', amount, reference });
+ * } catch (err) {
+ *   const bounds = amountBoundsOf(err);
+ *   if (bounds) return fail(422, `minimum top-up is ${bounds.minAmount} ${bounds.currency}`);
+ *   throw err;
+ * }
+ * ```
+ */
+export function amountBoundsOf(error: unknown): AmountBounds | null {
+  if (!(error instanceof ThruApiError) || error.status !== 400) return null;
+  const body = error.payload;
+  if (!body || typeof body !== 'object') return null;
+  const { minAmount, maxAmount, currency } = body as Record<string, unknown>;
+  // Both `minAmount` and `currency` are always present on a range failure; a malformed-amount 400
+  // carries neither. Checking the pair rather than just one keeps a future 400 with a coincidental
+  // `currency` from being read as a bound.
+  if (typeof minAmount !== 'string' || currency !== 'USD') return null;
+  if (maxAmount !== null && maxAmount !== undefined && typeof maxAmount !== 'string') return null;
+  return { minAmount, maxAmount: maxAmount ?? null, currency };
 }
 
 export type ThruServerClientOptions = {
@@ -57,6 +91,17 @@ export type ThruServerClient = {
       /** Close a session you no longer want redeemed. */
       expire(id: string): Promise<CheckoutSession>;
     };
+  };
+  payments: {
+    /**
+     * The authoritative answer to "how much arrived?".
+     *
+     * A `payment.*` event tells you the money moved; this tells you the cumulative
+     * `receivedAmount` now, and `checkoutSession { id, reference, metadata }` says whose it is.
+     * A crediting backend re-reads this on every event and grants from `receivedAmount`, never
+     * from the event body: a top-up can land between the event being written and being handled.
+     */
+    retrieve(id: string): Promise<Payment>;
   };
 };
 
@@ -110,7 +155,11 @@ export function createThruServerClient(options: ThruServerClientOptions): ThruSe
       }),
   };
 
-  return { baseUrl, checkout: { sessions } };
+  const payments = {
+    retrieve: (id: string) => request<Payment>(`/payments/${encodeURIComponent(id)}`),
+  };
+
+  return { baseUrl, checkout: { sessions }, payments };
 }
 
 function safeJson(text: string): unknown {

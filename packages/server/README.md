@@ -34,15 +34,15 @@ import { createThruServerClient } from '@thru-payment/server';
 const thru = createThruServerClient({ apiKey: process.env.THRU_API_KEY! });
 
 const session = await thru.checkout.sessions.create({
-  productSlug: 'sup-pro-monthly',
+  productSlug: 'pro-monthly',
   reference: user.id,                       // YOUR identifier. Never shown to the shopper.
   metadata: { plan: 'pro', creditsPerWeek: 400 },
   idempotencyKey: `sub:pro:${user.id}:${Math.floor(Date.now() / 3_600_000)}`,
 
-  successUrl: 'https://www.supwallet.app/billing/success',
-  cancelUrl:  'https://www.supwallet.app/billing/cancelled',
-  expiredUrl: 'https://www.supwallet.app/billing/expired',
-  pendingUrl: 'https://www.supwallet.app/billing/pending',
+  successUrl: 'https://example.com/billing/success',
+  cancelUrl:  'https://example.com/billing/cancelled',
+  expiredUrl: 'https://example.com/billing/expired',
+  pendingUrl: 'https://example.com/billing/pending',
 });
 
 return Response.redirect(session.url, 303);  // https://thru.la/c/cs_...
@@ -54,6 +54,53 @@ redirector. Omit them all and the session inherits whatever the product already 
 
 `idempotencyKey` makes the call safe to retry: the same key returns the same session, never a
 second one.
+
+### A custom amount
+
+A product can be priced by the shopper instead of the catalogue — a balance top-up, a bundle of
+credits. Create it with `pricingMode: 'custom_amount'` (and an optional `minAmount`/`maxAmount`)
+in the console or the products API, then name the amount on every session:
+
+```ts
+const session = await thru.checkout.sessions.create({
+  productSlug: 'credits',
+  amount: '37',                             // a decimal STRING, in USD. "37", "37.5", "37.50".
+  reference: order.id,
+  idempotencyKey: order.id,                 // same key + same amount → same session
+});
+session.amount;          // "37"    what you locked
+session.expectedAmount;  // "37"    what the payment will expect, in the stablecoin the shopper picks
+session.receivedAmount;  // null    what has arrived — the number you credit from, later
+```
+
+The rules, all enforced by thru:
+
+- **Precision.** At most two decimal places, never below `0.01`, no sign or exponent. Send a
+  string; the SDK never parses or rounds it.
+- **Locked.** The shopper's page has no amount field and the redeem endpoint rejects one. Nothing
+  can change the amount once the session exists.
+- **Bounded.** An amount outside the product's range is a `400` whose body carries the effective
+  bounds, so your form can show the real minimum *before* anyone transfers:
+
+  ```ts
+  import { amountBoundsOf } from '@thru-payment/server';
+
+  try {
+    session = await thru.checkout.sessions.create({ productSlug: 'credits', amount, reference });
+  } catch (err) {
+    const bounds = amountBoundsOf(err);     // { minAmount: "1", maxAmount: null, currency: "USD" } | null
+    if (bounds) return fail(422, `minimum top-up is ${bounds.minAmount} ${bounds.currency}`);
+    throw err;
+  }
+  ```
+
+- **Required there, refused elsewhere.** A custom-amount product without `amount` is a `400`; a
+  fixed-price product or an invoice *with* one is a `400` too.
+- **Idempotent on (source, amount).** Replaying a key with a different product or amount is a
+  `409`, never the old session handed back as if it matched.
+
+The public product (`GET /v1/public/products/:slug`) exposes `pricingMode`, `minAmount` (already
+the effective one) and `maxAmount`, if you want to render the bounds without a round-trip.
 
 ## 2. Handle the return
 
@@ -149,9 +196,61 @@ Fields worth knowing about:
 |---|---|
 | `reference`, `metadata` | yours, verbatim, top level |
 | `network` | gate on this if your entitlement is mainnet-only |
+| `amount`, `currency` | what you locked on a custom-amount session, in USD; both `null` otherwise |
+| `expectedAmount`, `receivedAmount` | what the payment asks for, and what has arrived |
 | `tokenAddress`, `decimals`, `expectedAmountAtomic` | exact reconciliation; a symbol like `USDC` collides across chains |
 | `late` | money arrived after you were told the session was dead — grant, *and* alert |
 | `txHash` | the on-chain receipt |
+
+### Crediting an amount: listen to `payment.*` instead
+
+A plan is granted because it was paid for; a top-up is credited by *how much arrived*. For the
+second question `checkout.session.*` is the wrong family — it reports the session's outcome once,
+while `payment.*` fires on every transition of the money: `underpaid` when a short transfer lands,
+`confirmed` (or `overpaid`) when a later top-up completes it. Subscribe to **one** family, not
+both, or you will credit twice.
+
+Every `payment.*` event now carries `checkoutSession: { id, reference, metadata }` when the payment
+belongs to a session, so you still know whose money it is. The key is **absent** — not `null` —
+on a payment that was never part of a session.
+
+```ts
+import { constructThruEvent, isPaymentEvent } from '@thru-payment/server/webhooks';
+
+const event = await constructThruEvent(raw, request.headers, process.env.THRU_WEBHOOK_SECRET!);
+
+if (isPaymentEvent(event) && event.type !== 'payment.expired') {
+  const orderId = event.data.checkoutSession?.reference;
+  if (!orderId) return Response.json({ ok: true, ignored: 'not one of ours' });
+
+  // The event says the money moved. The read says how much is there NOW — a top-up can have
+  // landed in between. Credit the DIFFERENCE between receivedAmount and what you already granted.
+  const payment = await thru.payments.retrieve(event.data.payment.id);
+  if (payment.network !== 'mainnet') return Response.json({ ok: true, ignored: 'testnet' });
+  await creditUpTo({ orderId, receivedAmount: payment.receivedAmount, token: payment.token });
+}
+```
+
+The amounts on a payment, and which one to read:
+
+| field | |
+|---|---|
+| `expectedAmount` | what was asked — the session's `amount`, or the rail's price |
+| `receivedAmount` | what has **arrived**, cumulative across every transfer to the address. Credit from this. |
+| `token`, `currency` | the stablecoin the shopper paid in; the amounts are in it |
+| `feeBps`, `feeAmount` | thru's platform fee on the row |
+| `status` | `underpaid` until `receivedAmount` reaches `expectedAmount`; then `confirmed` or `overpaid` |
+
+No threshold hides a small receipt: any detected transfer is added to `receivedAmount` and
+reported. `payment.expired` is a display state, not a close — a transfer that lands during the
+late grace is still credited, and the session event that follows says `late: true`.
+
+**One session, one payment that ever received money.** A shopper who was not pinned to a chain can
+switch rail before sending anything; thru retires the previous payment (`payment.expired`, with
+`checkoutSession`) and binds a new one. Once any money has arrived the rail is fixed. If money
+lands on a retired payment anyway, its `payment.*` event has no `checkoutSession` — the session
+has moved on — but `payment.metadata.thru.sessionId` still names it; treat that as a stray to
+reconcile by hand.
 
 ## 4. The layer underneath
 
@@ -179,9 +278,12 @@ await thru.checkout.sessions.list({ reference: user.id });
 |---|---|
 | `createThruServerClient({ apiKey, baseUrl?, fetch? })` | the client |
 | `thru.checkout.sessions.create / retrieve / list / expire` | sessions |
+| `thru.payments.retrieve` | a payment, with its `checkoutSession` and cumulative `receivedAmount` |
+| `amountBoundsOf(error)` | the `{ minAmount, maxAmount, currency }` a refused amount reports, or `null` |
 | `verifyThruReturn(params, secret, { toleranceSeconds?, now? })` | the return page |
 | `constructThruEvent(rawBody, headers, secret)` | webhooks — throws on failure |
 | `isCheckoutSessionEvent(event)` | narrows to the session family |
+| `isPaymentEvent(event)` | narrows to the payment family; switch on `event.type` inside |
 | `hmacHex`, `safeEqualHex` | the primitives, if you need them |
 | `ThruApiError`, `ThruSignatureError` | typed failures |
 

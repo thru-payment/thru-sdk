@@ -42,9 +42,11 @@ await check('main entry exports the documented surface', async () => {
   const m = await import(new URL('../dist/index.js', import.meta.url).href);
   for (const name of [
     'createThruServerClient',
+    'amountBoundsOf',
     'verifyThruReturn',
     'constructThruEvent',
     'isCheckoutSessionEvent',
+    'isPaymentEvent',
     'hmacHex',
     'safeEqualHex',
   ]) {

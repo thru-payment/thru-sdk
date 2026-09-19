@@ -9,7 +9,7 @@
  * Web Crypto only — no node:crypto, no Buffer — so it runs unchanged on Node 20+, Cloudflare
  * Workers, Deno and Bun. There is no browser build: this package holds an API key.
  */
-export { createThruServerClient, ThruApiError } from './client.js';
+export { amountBoundsOf, createThruServerClient, ThruApiError } from './client.js';
 export type { ThruServerClient, ThruServerClientOptions } from './client.js';
 
 export {
@@ -25,6 +25,7 @@ export type { VerifiedReturn, VerifyReturnOptions } from './return.js';
 export {
   constructThruEvent,
   isCheckoutSessionEvent,
+  isPaymentEvent,
   EVENT_TYPE_HEADER,
   SIGNATURE_HEADER,
   ThruSignatureError,
@@ -34,13 +35,23 @@ export { hmacHex, safeEqualHex } from './hmac.js';
 
 export { DEFAULT_API_BASE_URL } from './types.js';
 export type {
+  AmountBounds,
+  BlockchainTransaction,
   CheckoutSession,
   CheckoutSessionEvent,
+  CheckoutSessionEventType,
   CheckoutSessionList,
   CheckoutSessionSource,
   CheckoutSessionStatus,
   CreateCheckoutSessionParams,
+  DecimalString,
   ListCheckoutSessionsParams,
+  Payment,
+  PaymentCheckoutSessionRef,
+  PaymentEventData,
+  PaymentEventType,
+  PaymentExpiredEventData,
+  PaymentStatus,
   ReturnOutcome,
   ThruEvent,
   ThruEventType,

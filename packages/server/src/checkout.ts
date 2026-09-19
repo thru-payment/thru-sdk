@@ -3,7 +3,7 @@
  * webhook surface. Re-exported from the root entry too — this exists so an import in a page
  * component reads as what it is.
  */
-export { createThruServerClient, ThruApiError } from './client.js';
+export { amountBoundsOf, createThruServerClient, ThruApiError } from './client.js';
 export type { ThruServerClient, ThruServerClientOptions } from './client.js';
 export {
   DEFAULT_RETURN_TOLERANCE_SECONDS,
@@ -15,11 +15,16 @@ export {
 } from './return.js';
 export type { VerifiedReturn, VerifyReturnOptions } from './return.js';
 export type {
+  AmountBounds,
   CheckoutSession,
   CheckoutSessionList,
   CheckoutSessionSource,
   CheckoutSessionStatus,
   CreateCheckoutSessionParams,
+  DecimalString,
   ListCheckoutSessionsParams,
+  Payment,
+  PaymentCheckoutSessionRef,
+  PaymentStatus,
   ReturnOutcome,
 } from './types.js';

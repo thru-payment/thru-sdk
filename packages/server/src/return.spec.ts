@@ -147,16 +147,20 @@ describe('the CheckoutSession type is a superset of the event', () => {
       sessionId: 'cs_1',
       merchantId: 'm1',
       status: 'completed',
-      reference: 'sup_usr_01',
+      reference: 'usr_01',
       metadata: { plan: 'pro' },
       referenceOrigin: 'server',
       source: 'product',
       productId: 'p1',
-      productSlug: 'sup-pro-30d',
-      productName: 'SupWallet Pro — 30 days',
+      productSlug: 'pro-30d',
+      productName: 'Pro plan, 30 days',
       invoiceId: null,
       invoiceNumber: null,
       paymentId: 'pay_1',
+      // A fixed-price product: no locked amount, so both are null. (A custom-amount session reads
+      // `amount: '37', currency: 'USD'` here.)
+      amount: null,
+      currency: null,
       chain: 'sui',
       network: 'mainnet',
       token: 'USDC',
@@ -183,7 +187,7 @@ describe('the CheckoutSession type is a superset of the event', () => {
     });
     expect(grantFrom(session)).toEqual({
       key: 'cs_1',
-      who: 'sup_usr_01',
+      who: 'usr_01',
       paid: '20000000',
       live: true,
     });

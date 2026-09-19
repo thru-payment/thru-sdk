@@ -1,5 +1,10 @@
 import { hmacHex } from './hmac.js';
-import { ThruSignatureError, constructThruEvent, isCheckoutSessionEvent } from './webhooks.js';
+import {
+  ThruSignatureError,
+  constructThruEvent,
+  isCheckoutSessionEvent,
+  isPaymentEvent,
+} from './webhooks.js';
 
 // These mirror what apps/api/src/webhooks/webhook-delivery.service.ts actually sends:
 // `x-thru-signature: sha256=<hex>` over the raw JSON body, keyed by the endpoint's secret.
@@ -9,7 +14,7 @@ const BODY = JSON.stringify({
   id: '0f4c2b19-7a3d-4e58-9c01-83b6ea2d4177',
   type: 'checkout.session.completed',
   createdAt: '2026-09-16T12:04:11.482Z',
-  data: { sessionId: 'cs_abc', reference: 'sup_usr_01', status: 'completed', late: false },
+  data: { sessionId: 'cs_abc', reference: 'usr_01', status: 'completed', late: false },
 });
 
 async function signedHeaders(body = BODY, secret = SECRET) {
@@ -108,7 +113,7 @@ describe('isCheckoutSessionEvent', () => {
     expect(isCheckoutSessionEvent(event)).toBe(true);
     if (isCheckoutSessionEvent(event)) {
       // The point of the guard: `reference` is reachable without a cast.
-      expect(event.data.reference).toBe('sup_usr_01');
+      expect(event.data.reference).toBe('usr_01');
     }
   });
 
@@ -116,5 +121,124 @@ describe('isCheckoutSessionEvent', () => {
     const body = JSON.stringify({ id: 'e1', type: 'payment.confirmed', createdAt: '', data: {} });
     const event = await constructThruEvent(body, await signedHeaders(body), SECRET);
     expect(isCheckoutSessionEvent(event)).toBe(false);
+  });
+
+  it('carries the locked amount of a custom-amount session', async () => {
+    const body = JSON.stringify({
+      id: 'e2',
+      type: 'checkout.session.completed',
+      createdAt: '',
+      data: {
+        sessionId: 'cs_37',
+        reference: 'order_9',
+        status: 'completed',
+        amount: '37',
+        currency: 'USD',
+        token: 'USDC',
+        expectedAmount: '37',
+        receivedAmount: '37',
+        late: false,
+      },
+    });
+    const event = await constructThruEvent(body, await signedHeaders(body), SECRET);
+    if (!isCheckoutSessionEvent(event)) throw new Error('expected a session event');
+    expect(event.data.amount).toBe('37');
+    expect(event.data.currency).toBe('USD');
+    expect(event.data.receivedAmount).toBe('37');
+  });
+});
+
+describe('isPaymentEvent', () => {
+  // Mirrors apps/api/src/webhooks/webhook-events.service.ts: `payment.confirmed|underpaid|
+  // overpaid|refunded` are `{ merchantId, eventType, payment, blockchainTransaction }` plus
+  // `checkoutSession` when bound; `payment.expired` is the older flat body.
+  const moneyEvent = (type: string, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      id: `evt_${type}`,
+      type,
+      createdAt: '2026-09-19T10:00:00.000Z',
+      data: {
+        merchantId: 'm_1',
+        eventType: type,
+        payment: {
+          id: 'pay_1',
+          chain: 'base',
+          network: 'mainnet',
+          token: 'USDC',
+          amount: '37',
+          currency: 'USDC',
+          expectedAmount: '37',
+          receivedAmount: '20',
+          feeBps: 100,
+          feeAmount: '0.2',
+          status: 'underpaid',
+          metadata: { thru: { sessionId: 'cs_37', reference: 'order_9' } },
+        },
+        blockchainTransaction: { txHash: '0xabc', amount: '20', blockNumber: '12345678' },
+        ...extra,
+      },
+    });
+
+  it('narrows the five payment events and none of the others', async () => {
+    for (const type of ['payment.confirmed', 'payment.underpaid', 'payment.overpaid', 'payment.refunded']) {
+      const body = moneyEvent(type);
+      const event = await constructThruEvent(body, await signedHeaders(body), SECRET);
+      expect(isPaymentEvent(event)).toBe(true);
+      expect(isCheckoutSessionEvent(event)).toBe(false);
+    }
+    for (const type of ['checkout.session.completed', 'settlement.completed', 'facilitator.payment.settled']) {
+      const body = JSON.stringify({ id: 'e', type, createdAt: '', data: {} });
+      const event = await constructThruEvent(body, await signedHeaders(body), SECRET);
+      expect(isPaymentEvent(event)).toBe(false);
+    }
+  });
+
+  it('exposes `checkoutSession` on a session-bound payment, typed', async () => {
+    const body = moneyEvent('payment.underpaid', {
+      checkoutSession: { id: 'cs_37', reference: 'order_9', metadata: { userId: 'u_1' } },
+    });
+    const event = await constructThruEvent(body, await signedHeaders(body), SECRET);
+    if (!isPaymentEvent(event)) throw new Error('expected a payment event');
+    if (event.type === 'payment.expired') throw new Error('not an expiry');
+    // The point of the guard: the crediting handler reaches the merchant's own reference and the
+    // cumulative receivedAmount without a cast.
+    expect(event.data.checkoutSession?.reference).toBe('order_9');
+    expect(event.data.checkoutSession?.id).toBe('cs_37');
+    expect(event.data.payment.receivedAmount).toBe('20');
+    expect(event.data.payment.expectedAmount).toBe('37');
+    expect(event.data.blockchainTransaction?.txHash).toBe('0xabc');
+  });
+
+  it('leaves `checkoutSession` ABSENT, not null, on an unbound payment', async () => {
+    // The API adds the key only when there is a session, so a receiver written before sessions
+    // existed sees the exact shape it always did. A handler must test presence, not null.
+    const body = moneyEvent('payment.confirmed');
+    const event = await constructThruEvent(body, await signedHeaders(body), SECRET);
+    if (!isPaymentEvent(event) || event.type === 'payment.expired') throw new Error('unexpected');
+    expect('checkoutSession' in event.data).toBe(false);
+    expect(event.data.checkoutSession).toBeUndefined();
+  });
+
+  it('types the flat payment.expired body, with checkoutSession when a rail switch retired it', async () => {
+    const body = JSON.stringify({
+      id: 'evt_exp',
+      type: 'payment.expired',
+      createdAt: '',
+      data: {
+        paymentId: 'pay_old',
+        chain: 'base',
+        network: 'mainnet',
+        token: 'USDC',
+        expectedAmount: '37',
+        expiresAt: '2026-09-19T10:30:00.000Z',
+        checkoutSession: { id: 'cs_37', reference: 'order_9', metadata: null },
+      },
+    });
+    const event = await constructThruEvent(body, await signedHeaders(body), SECRET);
+    if (!isPaymentEvent(event)) throw new Error('expected a payment event');
+    if (event.type !== 'payment.expired') throw new Error('expected an expiry');
+    expect(event.data.paymentId).toBe('pay_old');
+    expect(event.data.expectedAmount).toBe('37');
+    expect(event.data.checkoutSession?.id).toBe('cs_37');
   });
 });
